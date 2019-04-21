@@ -1,0 +1,4 @@
+build/obj
+release/libmvfs.a
+release/mvfs
+tags
