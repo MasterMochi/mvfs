@@ -1,7 +1,7 @@
 #******************************************************************************#
 #*                                                                            *#
 #* src/libmvfs/Makefile                                                       *#
-#*                                                                 2019/04/06 *#
+#*                                                                 2019/04/22 *#
 #* Copyright (C) 2019 Mochi.                                                  *#
 #*                                                                            *#
 #******************************************************************************#
@@ -15,10 +15,10 @@ LIB = libmvfs
 SRCS = Mount.c
 
 
-# リリースディレクトリ
-RELEASE_DIR = ../../release
 # ビルドディレクトリ
 BUILD_DIR   = ../../build
+# リリースディレクトリ
+RELEASE_DIR = $(BUILD_DIR)/release
 # オブジェクトディレクトリ
 OBJ_DIR     = $(BUILD_DIR)/obj/$(LIB)
 
@@ -31,6 +31,9 @@ CFLAGS += -ffreestanding
 CFLAGS += -I../include
 CFLAGS += -I$(RELEASE_DIR)/include
 CFLAGS += -I$(BUILD_DIR)/include
+ifdef BASE_CFLAGS
+CFLAGS += $(BASE_CFLAGS)
+endif
 
 
 #******************************************************************************#
