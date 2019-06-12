@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/04/06 */
+/*                                                                 2019/06/12 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -106,7 +106,7 @@ static void Loop( void )
 
     /* 初期化 */
     errNo     = MK_MSG_ERR_NONE;
-    srcTaskId = MK_CONFIG_TASKID_MAX;
+    srcTaskId = MK_TASKID_MAX;
 
     /* バッファメモリ割当て */
     pMsgHdr = ( MvfsMsgHdr_t * ) malloc( MK_MSG_SIZE_MAX );
@@ -123,11 +123,11 @@ static void Loop( void )
     /* メインループ */
     while ( true ) {
         /* メッセージ受信 */
-        size = MkMsgReceive( MK_CONFIG_TASKID_NULL,     /* 受信タスクID   */
-                             pMsgHdr,                   /* バッファ       */
-                             MK_MSG_SIZE_MAX,           /* バッファサイズ */
-                             &srcTaskId,                /* 送信元タスクID */
-                             &errNo                );   /* エラー番号     */
+        size = MkMsgReceive( MK_TASKID_NULL,        /* 受信タスクID   */
+                             pMsgHdr,               /* バッファ       */
+                             MK_MSG_SIZE_MAX,       /* バッファサイズ */
+                             &srcTaskId,            /* 送信元タスクID */
+                             &errNo           );    /* エラー番号     */
 
         /* メッセージ受信結果判定 */
         if ( size == MK_MSG_RET_FAILURE ) {

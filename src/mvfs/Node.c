@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Node.c                                                            */
-/*                                                                 2019/03/31 */
+/*                                                                 2019/06/12 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -223,9 +223,7 @@ NodeInfo_t *NodeGetRoot( void )
 void NodeInit( void )
 {
     /* ルートノード作成 */
-    gpRootNode = NodeCreate( "/",
-                             NODE_TYPE_NORMAL_DIR,
-                             MK_CONFIG_TASKID_NULL );
+    gpRootNode = NodeCreate( "/", NODE_TYPE_NORMAL_DIR, MK_TASKID_NULL );
 
     return;
 }

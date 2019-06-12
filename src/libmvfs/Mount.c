@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Mount.c                                                        */
-/*                                                                 2019/04/08 */
+/*                                                                 2019/06/12 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -52,7 +52,7 @@ void LibMvfsMount( const char *pPath )
     ret    = MK_TASKNAME_RET_FAILURE;
     errNo  = MK_TASKNAME_ERR_NONE;
     retry  = 0;
-    taskId = MK_CONFIG_TASKID_NULL;
+    taskId = MK_TASKID_NULL;
     memset( &reqMsg,  0, sizeof ( MvfsMsgMountReq_t  ) );
     memset( &respMsg, 0, sizeof ( MvfsMsgMountResp_t ) );
 
