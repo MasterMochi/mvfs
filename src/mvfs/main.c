@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/06/12 */
+/*                                                                 2019/07/03 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -23,8 +23,9 @@
 #include <mvfs.h>
 
 /* モジュールヘッダ */
-#include "Node.h"
 #include "Mount.h"
+#include "Node.h"
+#include "Open.h"
 
 
 /******************************************************************************/
@@ -47,8 +48,9 @@ static void Loop( void );
 /******************************************************************************/
 /** 機能呼出し関数テーブル */
 static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
-    { MountDo };    /* MVFS_FUNCID_MOUNT */
-
+    { MountRcvMsgMountReq,      /* MVFS_FUNCID_MOUNT   */
+      OpenRcvMsgOpenReq,        /* MVFS_FUNCID_OPEN    */
+      OpenRcvMsgVfsOpenResp };  /* MVFS_FUNCID_VFSOPEN */
 
 /******************************************************************************/
 /* グローバル関数定義                                                         */
@@ -63,8 +65,9 @@ void main( void )
 {
     int32_t ret;    /* カーネル関数戻り値 */
 
-    /* ノード初期化 */
+    /* 各機能初期化 */
     NodeInit();
+    OpenInit();
 
     /* タスク名登録 */
     ret = MkTaskNameRegister( "VFS", NULL );

@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Mount.c                                                           */
-/*                                                                 2019/04/21 */
+/*                                                                 2019/07/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -25,8 +25,8 @@
 #include <mvfs.h>
 
 /* モジュールヘッダ */
-#include "Node.h"
 #include "Mount.h"
+#include "Node.h"
 
 
 /******************************************************************************/
@@ -38,8 +38,8 @@
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
 /* mount応答メッセージ送信 */
-static void SendMountResp( MkTaskId_t dst,
-                           uint32_t   result );
+static void SendMsgMountResp( MkTaskId_t dst,
+                              uint32_t   result );
 
 
 /******************************************************************************/
@@ -52,17 +52,17 @@ static void SendMountResp( MkTaskId_t dst,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       マウント実行
- * @details     機能呼出し元タスクIDtaskIdからのマウント要求を処理する。機能パ
- *              ラメータpParamからマウント先パスを取得しノードを生成した後、処
- *              理結果を機能呼出し元タスクIDへ返す。
+ * @brief       mount要求メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのmount要求メッセージを処理
+ *              する。メッセージバッファ(*pBuffer)からマウント先パスを取得し、
+ *              ノードを生成した後、処理結果をメッセージ送信元タスクIDへ返す。
  *
- * @param[in]   taskId  機能呼出し元タスクID
- * @param[in]   *pParam 機能パラメータ
+ * @param[in]   taskId   メッセージ送信元タスクID
+ * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void MountDo( MkTaskId_t taskId,
-              void       *pParam )
+void MountRcvMsgMountReq( MkTaskId_t taskId,
+                          void       *pBuffer )
 {
     int32_t           ret;          /* 関数戻り値     */
     MLibRet_t         retMLib;      /* MLib関数戻り値 */
@@ -71,7 +71,7 @@ void MountDo( MkTaskId_t taskId,
     MvfsMsgMountReq_t *pMsg;        /* メッセージ     */
 
     /* 初期化 */
-    pMsg = ( MvfsMsgMountReq_t * ) pParam;
+    pMsg = ( MvfsMsgMountReq_t * ) pBuffer;
 
     LibMlogPut(
         "[mvfs][%s:%d] %s() start. taskId=%d, path=%s.",
@@ -97,7 +97,7 @@ void MountDo( MkTaskId_t taskId,
         );
 
         /* mount応答メッセージ(失敗)送信 */
-        SendMountResp( taskId, MVFS_RESULT_FAILURE );
+        SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
 
         return;
     }
@@ -106,7 +106,10 @@ void MountDo( MkTaskId_t taskId,
     /* TODO */
 
     /* ノード作成 */
-    pNode = NodeCreate( pMsg->path, NODE_TYPE_MOUNT_FILE, taskId );
+    pNode = NodeCreate( &( pMsg->path[ 1 ] ),
+                        pMsg->path,
+                        NODE_TYPE_MOUNT_FILE,
+                        taskId                );
 
     /* 作成結果判定 */
     if ( pNode == NULL ) {
@@ -123,7 +126,7 @@ void MountDo( MkTaskId_t taskId,
         );
 
         /* mount応答メッセージ(失敗)送信 */
-        SendMountResp( taskId, MVFS_RESULT_FAILURE );
+        SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
 
         return;
     }
@@ -149,7 +152,7 @@ void MountDo( MkTaskId_t taskId,
         );
 
         /* mount応答メッセージ(失敗)送信 */
-        SendMountResp( taskId, MVFS_RESULT_FAILURE );
+        SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
 
         /* ノード解放 */
         NodeDelete( pNode );
@@ -158,7 +161,7 @@ void MountDo( MkTaskId_t taskId,
     }
 
     /* mount応答メッセージ(成功)送信 */
-    SendMountResp( taskId, MVFS_RESULT_SUCCESS );
+    SendMsgMountResp( taskId, MVFS_RESULT_SUCCESS );
 
     LibMlogPut(
         "[mvfs][%s:%d] %s() end. taskId=%u, path=%s.",
@@ -178,7 +181,7 @@ void MountDo( MkTaskId_t taskId,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       マウント応答メッセージ送信
+ * @brief       mount応答メッセージ送信
  * @details     メッセージ送信先のタスクID dstに処理結果resultでmount応答メッ
  *              セージを送信する。
  *
@@ -188,8 +191,8 @@ void MountDo( MkTaskId_t taskId,
  *                  - MVFS_RESULT_FAILURE 失敗
  */
 /******************************************************************************/
-static void SendMountResp( MkTaskId_t dst,
-                           uint32_t   result )
+static void SendMsgMountResp( MkTaskId_t dst,
+                              uint32_t   result )
 {
     int32_t            ret;     /* 関数戻り値 */
     uint32_t           errNo;   /* エラー番号 */
@@ -206,7 +209,7 @@ static void SendMountResp( MkTaskId_t dst,
     msg.result        = result;
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, retult=%u.",
+        "[mvfs][%s:%d] %s() dst=%u, result=%u.",
         __FILE__,
         __LINE__,
         __func__,

@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Node.c                                                            */
-/*                                                                 2019/06/12 */
+/*                                                                 2019/06/16 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -16,7 +16,9 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
+#include <libmlog.h>
 #include <MLib/MLibList.h>
+#include <MLib/MLibSplit.h>
 
 /* モジュール共通ヘッダ */
 #include <mvfs.h>
@@ -37,6 +39,9 @@
 static NodeList_t *CreateList( NodeInfo_t *pNode );
 /* エントリリスト削除 */
 static void DeleteList( NodeList_t *pList );
+/* ノードリスト内ノード取得 */
+static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
+                              const char *pName  );
 
 
 /******************************************************************************/
@@ -117,6 +122,7 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
  * @brief       ノード作成
  * @details     新しくノードを作成する。
  *
+ * @param[in]   *pName      ファイル名
  * @param[in]   *pPath      パス
  * @param[in]   type        タイプ
  *                  - NODE_TYPE_NORMAL_DIR 通常ディレクトリ
@@ -128,7 +134,8 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
  * @retval      NULL以外 成功(作成したノード)
  */
 /******************************************************************************/
-NodeInfo_t *NodeCreate( const char *pPath,
+NodeInfo_t *NodeCreate( const char *pName,
+                        const char *pPath,
                         uint32_t   type,
                         MkTaskId_t mountTaskId )
 {
@@ -146,6 +153,9 @@ NodeInfo_t *NodeCreate( const char *pPath,
 
     /* ノード初期化 */
     memset( pNode, 0, sizeof ( NodeInfo_t ) );
+
+    /* ファイル名設定 */
+    strncpy( pNode->name, pName, MVFS_NAME_MAXLEN );
 
     /* パス名設定 */
     strncpy( pNode->path, pPath, MVFS_PATH_MAXLEN );
@@ -202,6 +212,102 @@ void NodeDelete( NodeInfo_t *pNode )
 
 /******************************************************************************/
 /**
+ * @brief       ノード取得
+ * @details     絶対パス(*pPath)に該当するノード情報を取得する。
+ *
+ * @param[in]   *pPath パス
+ *
+ * @return      ノード情報を返す。
+ * @retval      NULL     該当ノード無し
+ * @retval      NULL以外 ノード情報
+ */
+/******************************************************************************/
+NodeInfo_t *NodeGet( const char *pPath )
+{
+    char              *pName;       /* ファイル名         */
+    size_t            num;          /* パス分割数         */
+    uint32_t          i;            /* カウンタ           */
+    uint32_t          errNo;        /* エラー番号         */
+    MLibRet_t         retMLib;      /* MLib戻り値         */
+    NodeInfo_t        *pNode;       /* ノード    　       */
+    MLibSplitHandle_t *pHandle;     /* 文字列分割ハンドル */
+
+    /* 初期化 */
+    pName   = NULL;
+    num     = 0;
+    i       = 0;
+    errNo   = MLIB_SPLIT_ERR_NONE;
+    retMLib = MLIB_FAILURE;
+    pNode   = NULL;
+    pHandle = NULL;
+
+    /* 絶対パス判定 */
+    if ( pPath[ 0 ] != '/' ) {
+        /* 絶対パスでない */
+
+        /* 該当ノード無し */
+        return NULL;
+    }
+
+    /* ルートノード取得 */
+    pNode = NodeGetRoot();
+
+    /* パス文字列分割 */
+    retMLib = MLibSplitInitByDelimiter( &pHandle,
+                                        &pPath[ 1 ],
+                                        strlen( pPath ),
+                                        '/',
+                                        &errNo           );
+
+    /* 分割結果判定 */
+    if ( retMLib != MLIB_SUCCESS ) {
+        /* 失敗 */
+
+        LibMlogPut(
+            "[mvfs][%s:%d] %s() error. pPath=%s, errNo=%#X",
+            __FILE__,
+            __LINE__,
+            __func__,
+            pPath,
+            errNo
+        );
+
+        return NULL;
+    }
+
+    /* 分割数取得 */
+    retMLib = MLibSplitGetNum( pHandle, &num, &errNo );
+
+    for ( i = 0; i < num; i++ ) {
+        /* 文字列取得 */
+        MLibSplitGet( pHandle, i, &pName, &errNo );
+
+        /* 親ノードからノード取得 */
+        pNode = GetInNode( pNode, pName );
+    }
+
+    /* 文字列分割ハンドル解放 */
+    retMLib = MLibSplitTerm( &pHandle, &errNo );
+
+    /* 解放結果判定 */
+    if ( retMLib != MLIB_SUCCESS ) {
+        /* 失敗 */
+
+        LibMlogPut(
+            "[mvfs][%s:%d] %s() error. errNo=%#X",
+            __FILE__,
+            __LINE__,
+            __func__,
+            errNo
+        );
+    }
+
+    return pNode;
+}
+
+
+/******************************************************************************/
+/**
  * @brief       ルートノード取得
  * @details     ルートディレクトリのノード情報を取得する。
  *
@@ -223,7 +329,7 @@ NodeInfo_t *NodeGetRoot( void )
 void NodeInit( void )
 {
     /* ルートノード作成 */
-    gpRootNode = NodeCreate( "/", NODE_TYPE_NORMAL_DIR, MK_TASKID_NULL );
+    gpRootNode = NodeCreate( "", "/", NODE_TYPE_NORMAL_DIR, MK_TASKID_NULL );
 
     return;
 }
@@ -294,6 +400,65 @@ static void DeleteList( NodeList_t *pList )
     free( pList );
 
     return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       ノード内ノード取得
+ * @details     ノードが持つノードリストからファイル名(pName)に該当するノードを
+ *              取得する。
+ *
+ * @param[in]   *pName ファイル名
+ *
+ * @return      ノードを返す。
+ * @retval      NULL     該当ノード無し
+ * @retval      NULL以外 該当ノード
+ */
+/******************************************************************************/
+static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
+                              const char *pName  )
+{
+    int        retCmp;  /* ファイル名比較結果 */
+    uint32_t   i;       /* カウンタ           */
+    NodeList_t *pList;  /* ノードリスト       */
+
+    /* 初期化 */
+    pList = NULL;
+
+    /* リスト取得 */
+    pList = ( NodeList_t * )
+            MLibListGetNextNode( &( pNode->entryList ),
+                                 ( MLibListNode_t * ) pList );
+
+    while ( pList != NULL ) {
+        /* リストエントリ毎に繰り返し */
+        for ( i = 0; i < NODE_ENTRY_NUM; i++ ) {
+            /* ノード有無判定 */
+            if ( pList->pEntry[ i ] == NULL ) {
+                /* ノード無し */
+
+                continue;
+            }
+
+            /* ファイル名比較 */
+            retCmp = strncmp( pName, pList->pEntry[ i ]->name, MVFS_NAME_MAXLEN );
+
+            /* 判定 */
+            if ( retCmp == 0 ) {
+                /* 一致 */
+
+                return pList->pEntry[ i ];
+            }
+        }
+
+        /* 次リスト取得 */
+        pList = ( NodeList_t * )
+                MLibListGetNextNode( &( pNode->entryList ),
+                                     ( MLibListNode_t * ) pList );
+    }
+
+    return NULL;
 }
 
 

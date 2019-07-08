@@ -1,6 +1,6 @@
 /******************************************************************************/
 /*                                                                            */
-/* src/libmvfs/Mount.c                                                        */
+/* src/libmvfs/Open.c                                                         */
 /*                                                                 2019/07/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
@@ -21,18 +21,22 @@
 /* 共通ヘッダ */
 #include <mvfs.h>
 
+/* モジュール内ヘッダ */
+#include "Fd.h"
+
 
 /******************************************************************************/
-/* ローカル関数宣言                                                           */
+/* ローカル関数定義                                                           */
 /******************************************************************************/
-/* mount応答受信 */
-static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
-                                      MvfsMsgMountResp_t *pMsg,
-                                      uint32_t           *pErrNo );
-/* mount要求送信 */
-static LibMvfsRet_t SendMountReq( MkTaskId_t taskId,
-                                  const char *pPath,
-                                  uint32_t   *pErrNo );
+/* open応答受信 */
+static LibMvfsRet_t ReceiveOpenResp( MkTaskId_t        taskId,
+                                     MvfsMsgOpenResp_t *pMsg,
+                                     uint32_t          *pErrNo );
+/* open要求送信 */
+static LibMvfsRet_t SendOpenReq( MkTaskId_t taskId,
+                                 const char *pPath,
+                                 uint32_t   localFd,
+                                 uint32_t   *pErrNo  );
 
 
 /******************************************************************************/
@@ -40,10 +44,11 @@ static LibMvfsRet_t SendMountReq( MkTaskId_t taskId,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       マウントファイル作成
- * @details     仮想ファイルサーバにmount要求メッセージを送信して、マウントファ
- *              イルの作成を要求し、その応答を待ち合わせる。
+ * @brief       ファイルオープン
+ * @details     仮想ファイルサーバにopen要求メッセージを送信して、ファイルの
+ *              オープンを要求し、その応答を待ち合わせる。
  *
+ * @param[out]  *pFd    ファイルディスクリプタ
  * @param[in]   *pPath  ファイルパス(絶対パス)
  * @param[out]  *pErrNo エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
@@ -58,17 +63,20 @@ static LibMvfsRet_t SendMountReq( MkTaskId_t taskId,
  * @retval      LIBMVFS_RET_FAILURE 異常終了
  */
 /******************************************************************************/
-LibMvfsRet_t LibMvfsMount( const char *pPath,
-                           uint32_t   *pErrNo )
+LibMvfsRet_t LibMvfsOpen( uint32_t   *pLocalFd,
+                          const char *pPath,
+                          uint32_t   *pErrNo    )
 {
-    MkTaskId_t         taskId;  /* タスクID       */
-    LibMvfsRet_t       ret;     /* 戻り値         */
-    MvfsMsgMountResp_t respMsg; /* 応答メッセージ */
+    FdInfo_t          *pFdInfo; /* ローカルFD情報 */
+    MkTaskId_t        taskId;   /* タスクID       */
+    LibMvfsRet_t      ret;      /* 戻り値         */
+    MvfsMsgOpenResp_t respMsg;  /* 応答メッセージ */
 
     /* 初期化 */
-    taskId = MK_TASKID_NULL;
-    ret    = LIBMVFS_RET_FAILURE;
-    memset( &respMsg, 0, sizeof ( MvfsMsgMountResp_t ) );
+    pFdInfo = NULL;
+    taskId  = MK_TASKID_NULL;
+    ret     = LIBMVFS_RET_FAILURE;
+    memset( &respMsg, 0, sizeof ( respMsg ) );
 
     /* パラメータチェック */
     if ( pPath == NULL ) {
@@ -90,24 +98,41 @@ LibMvfsRet_t LibMvfsMount( const char *pPath,
         return LIBMVFS_RET_FAILURE;
     }
 
-    /* mount要求メッセージ送信 */
-    ret = SendMountReq( taskId, pPath, pErrNo );
+    /* ローカルFD割当 */
+    pFdInfo = FdAlloc();
+
+    /* 割当結果判定 */
+    if ( pFdInfo == NULL ) {
+        /* 失敗 */
+
+        /* エラー番号設定 */
+        MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    /* open要求メッセージ送信 */
+    ret = SendOpenReq( taskId, pPath, pFdInfo->localFd, pErrNo );
 
     /* 送信結果判定 */
     if ( ret != LIBMVFS_RET_SUCCESS ) {
         /* 失敗 */
 
+        /* ローカルFD解放 */
+        FdFree( pFdInfo );
+
         return LIBMVFS_RET_FAILURE;
     }
 
-    /* mount応答メッセージ受信 */
-    ret = ReceiveMountResp( taskId,
-                            &respMsg,
-                            pErrNo    );
+    /* open応答メッセージ受信 */
+    ret = ReceiveOpenResp( taskId, &respMsg, pErrNo );
 
     /* 受信結果判定 */
     if ( ret != LIBMVFS_RET_SUCCESS ) {
         /* 失敗 */
+
+        /* ローカルFD解放 */
+        FdFree( pFdInfo );
 
         return LIBMVFS_RET_FAILURE;
     }
@@ -116,11 +141,20 @@ LibMvfsRet_t LibMvfsMount( const char *pPath,
     if ( respMsg.result != MVFS_RESULT_SUCCESS ) {
         /* 失敗 */
 
+        /* ローカルFD解放 */
+        FdFree( pFdInfo );
+
         /* エラー番号設定 */
         MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_SERVER );
 
         return LIBMVFS_RET_FAILURE;
     }
+
+    /* グローバルFD設定 */
+    pFdInfo->globalFd = respMsg.globalFd;
+
+    /* ローカルFD設定 */
+    *pLocalFd = pFdInfo->localFd;
 
     return LIBMVFS_RET_SUCCESS;
 }
@@ -131,8 +165,8 @@ LibMvfsRet_t LibMvfsMount( const char *pPath,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       mount応答受信
- * @details     仮想ファイルサーバからmount応答メッセージの受信を待ち合わせる。
+ * @brief       open応答受信
+ * @details     仮想ファイルサーバからopen応答メッセージの受信を待ち合わせる。
  *
  * @param[in]   taskId  仮想ファイルサーバタスクID
  * @param[out]  *pMsg   受信メッセージバッファ
@@ -147,9 +181,9 @@ LibMvfsRet_t LibMvfsMount( const char *pPath,
  * @retval      LIBMVFS_RET_FAILURE 異常終了
  */
 /******************************************************************************/
-static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
-                                      MvfsMsgMountResp_t *pMsg,
-                                      uint32_t           *pErrNo )
+static LibMvfsRet_t ReceiveOpenResp( MkTaskId_t        taskId,
+                                     MvfsMsgOpenResp_t *pMsg,
+                                     uint32_t          *pErrNo )
 {
     int32_t  size;  /* 受信メッセージサイズ */
     uint32_t errNo; /* カーネルエラー番号   */
@@ -161,9 +195,9 @@ static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
     /* メッセージ受信 */
     size = MkMsgReceive( taskId,                            /* 受信タスクID   */
                          pMsg,                              /* バッファ       */
-                         sizeof ( MvfsMsgMountResp_t ),     /* バッファサイズ */
+                         sizeof ( MvfsMsgOpenResp_t ),      /* バッファサイズ */
                          NULL,                              /* 送信元タスクID */
-                         &errNo                         );  /* エラー番号     */
+                         &errNo                        );   /* エラー番号     */
 
     /* 受信結果判定 */
     if ( size == MK_MSG_RET_FAILURE ) {
@@ -193,7 +227,7 @@ static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
     }
 
     /* 受信サイズチェック */
-    if ( size != sizeof ( MvfsMsgMountResp_t ) ) {
+    if ( size != sizeof ( MvfsMsgOpenResp_t ) ) {
         /* 不正 */
 
         /* エラー番号設定 */
@@ -203,8 +237,8 @@ static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
     }
 
     /* メッセージチェック */
-    if ( ( pMsg->header.funcId != MVFS_FUNCID_MOUNT ) &&
-         ( pMsg->header.type   != MVFS_TYPE_RESP    )    ) {
+    if ( ( pMsg->header.funcId != MVFS_FUNCID_OPEN ) &&
+         ( pMsg->header.type   != MVFS_TYPE_RESP   )    ) {
         /* メッセージ不正 */
 
         /* エラー番号設定 */
@@ -219,14 +253,15 @@ static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
 
 /******************************************************************************/
 /**
- * @brief       mount要求送信
- * @details     仮想ファイルサーバにmount要求メッセージを送信する。
+ * @brief       open要求送信
+ * @details     仮想ファイルサーバにopen要求メッセージを送信する。
  *
  * @param[in]   taskId  仮想ファイルサーバのタスクID
  * @param[in]   *pPath  ファイルパス(絶対パス)
+ * @param[in]   localFd ローカルファイルディスクリプタ
  * @param[out]  *pErrNo エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
- *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不明
+ *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
  *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
  *                  - LIBMVFS_ERR_OTHER     その他エラー
  *
@@ -235,35 +270,37 @@ static LibMvfsRet_t ReceiveMountResp( MkTaskId_t         taskId,
  * @retval      LIBMVFS_RET_FAILURE 異常終了
  */
 /******************************************************************************/
-static LibMvfsRet_t SendMountReq( MkTaskId_t taskId,
-                                  const char *pPath,
-                                  uint32_t   *pErrNo )
+static LibMvfsRet_t SendOpenReq( MkTaskId_t taskId,
+                                 const char *pPath,
+                                 uint32_t   localFd,
+                                 uint32_t   *pErrNo  )
 {
-    int32_t           ret;      /* カーネル戻り値     */
-    uint32_t          errNo;    /* カーネルエラー番号 */
-    MvfsMsgMountReq_t msg;      /* 要求メッセージ     */
+    int32_t          ret;    /* カーネル戻り値     */
+    uint32_t         errNo;  /* カーネルエラー番号 */
+    MvfsMsgOpenReq_t msg;    /* 要求メッセージ     */
 
     /* 初期化 */
     ret   = MK_MSG_RET_FAILURE;
     errNo = MK_MSG_ERR_NONE;
-    memset( &msg,  0, sizeof ( msg ) );
+    memset( &msg, 0, sizeof ( msg ) );
 
     /* メッセージ作成 */
-    msg.header.funcId = MVFS_FUNCID_MOUNT;
+    msg.header.funcId = MVFS_FUNCID_OPEN;
     msg.header.type   = MVFS_TYPE_REQ;
+    msg.localFd       = localFd;
     strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( taskId,            /* 送信先タスクID   */
-                     &msg,              /* 送信メッセージ   */
-                     sizeof ( msg ),    /* 送信メッセージ長 */
-                     &errNo          ); /* エラー番号       */
+    ret = MkMsgSend( taskId,                /* 送信先タスクID   */
+                     &msg,                  /* 送信メッセージ   */
+                     sizeof ( msg ),        /* 送信メッセージ長 */
+                     &errNo          );     /* エラー番号       */
 
     /* 送信結果判定 */
     if ( ret != MK_MSG_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー判定 */
+        /* エラー番号判定 */
         if ( errNo == MK_MSG_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
