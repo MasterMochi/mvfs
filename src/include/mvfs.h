@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/include/mvfs.h                                                         */
-/*                                                                 2019/07/06 */
+/*                                                                 2019/07/11 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -22,12 +22,14 @@
 /* 定義                                                                       */
 /******************************************************************************/
 /* 機能ID */
-#define MVFS_FUNCID_MOUNT   ( 0 )  /**< mount        */
-#define MVFS_FUNCID_OPEN    ( 1 )  /**< open         */
-#define MVFS_FUNCID_VFSOPEN ( 2 )  /**< vfsOpen      */
-#define MVFS_FUNCID_MAX     ( 2 )  /**< 機能ID最大値 */
-#define MVFS_FUNCID_NUM     \
-    ( MVFS_FUNCID_MAX + 1 )        /**< 機能数       */
+#define MVFS_FUNCID_MOUNT    ( 0 )  /**< mount        */
+#define MVFS_FUNCID_OPEN     ( 1 )  /**< open         */
+#define MVFS_FUNCID_VFSOPEN  ( 2 )  /**< vfsOpen      */
+#define MVFS_FUNCID_WRITE    ( 3 )  /**< write        */
+#define MVFS_FUNCID_VFSWRITE ( 4 )  /**< vfsWrite     */
+#define MVFS_FUNCID_MAX      ( 4 )  /**< 機能ID最大値 */
+#define MVFS_FUNCID_NUM      \
+    ( MVFS_FUNCID_MAX + 1 )         /**< 機能数       */
 
 /* タイプ */
 #define MVFS_TYPE_REQ  ( 0 )    /**< 要求 */
@@ -50,6 +52,9 @@
 /** FD無効値 */
 #define MVFS_FD_NULL ( 0xFFFFFFFF )
 
+/** バッファ最大サイズ */
+#define MVFS_BUFFER_SIZE_MAX ( 24064 )
+
 /** メッセージヘッダ */
 typedef struct {
     uint32_t funcId;    /**< 機能ID */
@@ -62,13 +67,11 @@ typedef struct {
     char         path[ MVFS_PATH_MAXLEN + 1 ];  /**< パス             */
 } MvfsMsgMountReq_t;
 
-
 /** mount応答メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;    /**< メッセージヘッダ */
     uint32_t     result;    /**< 処理結果         */
 } MvfsMsgMountResp_t;
-
 
 /** open要求メッセージ */
 typedef struct {
@@ -97,6 +100,39 @@ typedef struct {
     MvfsMsgHdr_t header;    /**< メッセージヘッダ */
     uint32_t     result;    /**< 処理結果         */
 } MvfsMsgVfsOpenResp_t;
+
+/** write要求メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
+    uint32_t     globalFd;      /**< グローバルFD       */
+    uint64_t     writeIdx;      /**< 書込みインデックス */
+    size_t       size;          /**< 書込みサイズ       */
+    char         pBuffer[];     /**< データ             */
+} MvfsMsgWriteReq_t;
+
+/** write応答メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ */
+    uint32_t     result;        /**< 処理結果         */
+    size_t       size;          /**< 書込み実施サイズ */
+} MvfsMsgWriteResp_t;
+
+/** vfsWrite要求メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
+    uint32_t     globalFd;      /**< グローバルFD       */
+    uint64_t     writeIdx;      /**< 書込みインデックス */
+    size_t       size;          /**< 書込みサイズ       */
+    char         pBuffer[];     /**< データ             */
+} MvfsMsgVfsWriteReq_t;
+
+/** vfsWrite応答メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ */
+    uint32_t     globalFd;      /**< グローバルFD     */
+    uint32_t     result;        /**< 処理結果         */
+    size_t       size;          /**< 書込み実施サイズ */
+} MvfsMsgVfsWriteResp_t;
 
 
 /******************************************************************************/

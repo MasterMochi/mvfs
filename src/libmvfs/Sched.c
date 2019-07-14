@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/07/07 */
+/*                                                                 2019/07/11 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -10,6 +10,7 @@
 /******************************************************************************/
 /* 標準ヘッダ */
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,7 +41,9 @@ static void ProcOther( LibMvfsSchedInfo_t *pInfo,
 /* vfsOpen要求メッセージ処理 */
 static void ProcVfsOpenReq( LibMvfsSchedInfo_t  *pInfo,
                             MvfsMsgVfsOpenReq_t *pMsg   );
-
+/* vfsWrite要求メッセージ処理 */
+static void ProcVfsWriteReq( LibMvfsSchedInfo_t   *pInfo,
+                             MvfsMsgVfsWriteReq_t *pMsg   );
 
 
 /******************************************************************************/
@@ -179,6 +182,13 @@ static void Proc( LibMvfsSchedInfo_t *pInfo,
 
         /* vfsOpen要求処理 */
         ProcVfsOpenReq( pInfo, ( MvfsMsgVfsOpenReq_t * ) pMsg );
+
+    } else if ( ( pMsg->funcId == MVFS_FUNCID_VFSWRITE ) &&
+                ( pMsg->type   == MVFS_TYPE_REQ        )    ) {
+        /* vfsWrite要求 */
+
+        /* vfsWrite要求処理 */
+        ProcVfsWriteReq( pInfo, ( MvfsMsgVfsWriteReq_t * ) pMsg );
     }
 
     return;
@@ -240,7 +250,41 @@ static void ProcVfsOpenReq( LibMvfsSchedInfo_t  *pInfo,
         /* 設定無し */
 
         /* vfsOpen応答送信 */
-        LibMvfsSendVfsOpenResp( MVFS_RESULT_FAILURE, NULL );
+        LibMvfsSendVfsOpenResp( MVFS_RESULT_SUCCESS, NULL );
+    }
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsWrite要求メッセージ処理
+ * @details     vfsWrite要求コールバック関数を呼び出す。コールバック関数が設定さ
+ *              れていない場合は、vfsWrite応答を行う。
+ *
+ * @param[in]   *pInfo スケジューラ情報
+ * @param[in]   *pMsg  受信メッセージ
+ */
+/******************************************************************************/
+static void ProcVfsWriteReq( LibMvfsSchedInfo_t   *pInfo,
+                             MvfsMsgVfsWriteReq_t *pMsg   )
+{
+    /* コールバック関数設定判定 */
+    if ( pInfo->callBack.pVfsWrite != NULL ) {
+        /* 設定有り */
+
+        /* コールバック */
+        ( pInfo->callBack.pVfsWrite )( pMsg->globalFd,
+                                       pMsg->writeIdx,
+                                       pMsg->pBuffer,
+                                       pMsg->size      );
+
+    } else {
+        /* 設定無し */
+
+        /* vfsWrite応答送信 */
+        LibMvfsSendVfsWriteResp( pMsg->globalFd, MVFS_RESULT_FAILURE, 0, NULL );
     }
 
     return;

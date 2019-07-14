@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
-/* src/mvfs/Open.c                                                            */
-/*                                                                 2019/07/11 */
+/* src/mvfs/Write.c                                                           */
+/*                                                                 2019/07/13 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -9,6 +9,7 @@
 /* インクルード                                                               */
 /******************************************************************************/
 /* 標準ヘッダ */
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -25,40 +26,40 @@
 
 /* モジュールヘッダ */
 #include "Fd.h"
-#include "Open.h"
-#include "Node.h"
 
 
 /******************************************************************************/
 /* 定義                                                                       */
 /******************************************************************************/
 /* 状態 */
-#define STATE_INI               ( 1 )   /**< 初期状態        */
-#define STATE_VFSOPEN_RESP_WAIT ( 2 )   /**< vfsOpen応答待ち */
+#define STATE_INI                ( 1 )  /**< 初期状態     */
+#define STATE_VFSWRITE_RESP_WAIT ( 2 )  /**< vfsWrite待ち */
 
 /* イベント */
-#define EVENT_OPEN_REQ     ( 1 )    /**< open要求イベント    */
-#define EVENT_VFSOPEN_RESP ( 2 )    /**< vfsOpen応答イベント */
+#define EVENT_WRITE_REQ     ( 1 )   /**< write要求イベント    */
+#define EVENT_VFSWRITE_RESP ( 2 )   /**< vdsWrite応答イベント */
 
 /** 状態遷移タスクパラメータ */
 typedef struct {
     MkTaskId_t taskId;      /**< タスクID         */
     void       *pBuffer;    /**< イベントバッファ */
+    FdInfo_t   *pFdInfo;    /**< FD情報           */
 } StateTaskParam_t;
 
 
 /******************************************************************************/
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
-/* open応答メッセージ送信 */
-static void SendMsgOpenResp( MkTaskId_t taskId,
-                             uint32_t   result,
-                             uint32_t   globalFd );
-/* vfsOpen要求メッセージ送信 */
-static void SendMsgVfsOpenReq( MkTaskId_t dst,
-                               MkPid_t    pid,
-                               uint32_t   fd,
-                               const char *pPath );
+/* write応答メッセージ送信 */
+static void SendMsgWriteResp( MkTaskId_t taskId,
+                              uint32_t   globalFd,
+                              size_t     size      );
+/* vfsWrite要求メッセージ送信 */
+static void SendMsgVfsWriteReq( MkTaskId_t dst,
+                                uint32_t   globalFd,
+                                uint64_t   writeIdx,
+                                const char *pBuffer,
+                                size_t     size      );
 
 /* 状態遷移タスク */
 static MLibState_t Task0101( void *pArg );
@@ -70,21 +71,16 @@ static MLibState_t Task0202( void *pArg );
 /******************************************************************************/
 /** 状態遷移表 */
 static const MLibStateTransition_t gStt[] = {
-    /*-----------------------+-------------------+---------+--------------------------------*/
-    /* 状態                  | イベント          | タスク  | { 遷移先状態                 } */
-    /*-----------------------+-------------------+---------+--------------------------------*/
-    { STATE_INI              , EVENT_OPEN_REQ    , Task0101, { STATE_VFSOPEN_RESP_WAIT, 0 } },
-    { STATE_INI              , EVENT_VFSOPEN_RESP, NULL    , { STATE_INI              , 0 } },
-    { STATE_VFSOPEN_RESP_WAIT, EVENT_OPEN_REQ    , NULL    , { STATE_VFSOPEN_RESP_WAIT, 0 } },
-    { STATE_VFSOPEN_RESP_WAIT, EVENT_VFSOPEN_RESP, Task0202, { STATE_INI              , 0 } }  };
-    /*-----------------------+-------------------+---------+--------------------------------*/
+    { STATE_INI               , EVENT_WRITE_REQ    , Task0101, { STATE_VFSWRITE_RESP_WAIT, 0 } },
+    { STATE_INI               , EVENT_VFSWRITE_RESP, NULL    , { STATE_INI               , 0 } },
+    { STATE_VFSWRITE_RESP_WAIT, EVENT_WRITE_REQ    , NULL    , { STATE_VFSWRITE_RESP_WAIT, 0 } },
+    { STATE_VFSWRITE_RESP_WAIT, EVENT_VFSWRITE_RESP, Task0202, { STATE_INI               , 0 } }  };
 
 /** 状態遷移ハンドル */
 static MLibStateHandle_t gStateHdl;
 
 /* TODO */
-static MkTaskId_t gOpenTaskId;
-static uint32_t gGlobalFd;
+static MkTaskId_t gWriteTaskId;
 
 
 /******************************************************************************/
@@ -92,11 +88,11 @@ static uint32_t gGlobalFd;
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       Open機能初期化
+ * @brief       write機能初期化
  * @details     状態遷移を初期化する。
  */
 /******************************************************************************/
-void OpenInit( void )
+void WriteInit( void )
 {
     uint32_t  errNo;    /* エラー番号 */
     MLibRet_t ret;      /* MLIB戻り値 */
@@ -117,7 +113,7 @@ void OpenInit( void )
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateInit() error. ret=%d, errNo=%#X",
+            "[mvfs][%s:%d] %s(): MLibStateInit() error. ret=%d, errNo=0x%X",
             __FILE__,
             __LINE__,
             __func__,
@@ -132,56 +128,80 @@ void OpenInit( void )
 
 /******************************************************************************/
 /**
- * @brief       vfsOpen応答メッセージ受信
- * @details     メッセージ送信元タスクID(taskId)からのvfsOpen応答メッセージを処
- *              理する。
+ * @brief       vfsWrite応答メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのvfsWrite応答メッセージを
+ *              処理する。
  *
  * @param[in]   taskId   メッセージ送信元タスクID
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
-                            void       *pBuffer )
+void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
+                              void       *pBuffer )
 {
-    uint32_t         errNo;     /* エラー番号               */
-    MLibRet_t        retMLib;   /* MLIB戻り値               */
-    MLibState_t      prevState; /* 遷移前状態               */
-    MLibState_t      nextState; /* 遷移後状態               */
-    StateTaskParam_t param;     /* 状態遷移タスクパラメータ */
+    uint32_t              errNo;        /* エラー番号               */
+    FdInfo_t              *pFdInfo;     /* FD情報                   */
+    MLibRet_t             retMLib;      /* MLIB戻り値               */
+    MLibState_t           prevState;    /* 遷移前状態               */
+    MLibState_t           nextState;    /* 遷移後状態               */
+    StateTaskParam_t      param;        /* 状態遷移タスクパラメータ */
+    MvfsMsgVfsWriteResp_t *pMsg;        /* メッセージ               */
 
     /* 初期化 */
     errNo     = MLIB_STATE_ERR_NONE;
+    pFdInfo   = NULL;
     retMLib   = MLIB_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
+    pMsg      = ( MvfsMsgVfsWriteResp_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d",
+        "[mvfs][%s:%d] %s() start. taskId=%d, result=%u, size=%u",
         __FILE__,
         __LINE__,
         __func__,
-        taskId
+        taskId,
+        pMsg->result,
+        pMsg->size
     );
+
+    /* FD情報取得 */
+    pFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( pFdInfo == NULL ) {
+        /* 失敗 */
+
+        LibMlogPut(
+            "[mvfs][%s:%d] %s(): FD error.",
+            __FILE__,
+            __LINE__,
+            __func__
+        );
+
+        return;
+    }
 
     /* 状態遷移パラメータ設定 */
     param.taskId  = taskId;
     param.pBuffer = pBuffer;
+    param.pFdInfo = pFdInfo;
 
     /* 状態遷移実行 */
     retMLib = MLibStateExec( &gStateHdl,
-                             EVENT_VFSOPEN_RESP,
+                             EVENT_VFSWRITE_RESP,
                              &param,
                              &prevState,
                              &nextState,
-                             &errNo              );
+                             &errNo               );
 
     /* 実行結果判定 */
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=%#X",
+            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=0x%X",
             __FILE__,
             __LINE__,
             __func__,
@@ -207,59 +227,63 @@ void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
 
 /******************************************************************************/
 /**
- * @brief       open要求メッセージ受信
- * @details     メッセージ送信元タスクID(taskId)からのopen要求メッセージを処理
+ * @brief       write要求メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのwrite要求メッセージを処理
  *              する。
  *
  * @param[in]   taskId   メッセージ送信元タスクID
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void OpenRcvMsgOpenReq( MkTaskId_t taskId,
-                        void       *pBuffer )
+void WriteRcvMsgWriteReq( MkTaskId_t taskId,
+                          void       *pBuffer )
 {
-    uint32_t         errNo;     /* エラー番号               */
-    MLibRet_t        retMLib;   /* MLIB戻り値               */
-    NodeInfo_t       *pNode;    /* ノード                   */
-    MLibState_t      prevState; /* 遷移前状態               */
-    MLibState_t      nextState; /* 遷移後状態               */
-    MvfsMsgOpenReq_t *pMsg;     /* メッセージ               */
-    StateTaskParam_t param;     /* 状態遷移タスクパラメータ */
+    uint32_t          errNo;        /* エラー番号               */
+    FdInfo_t          *pFdInfo;     /* FD情報                   */
+    MLibRet_t         retMLib;      /* MLIB戻り値               */
+    NodeInfo_t        *pNode;       /* ノード                   */
+    MLibState_t       prevState;    /* 遷移前状態               */
+    MLibState_t       nextState;    /* 遷移後状態               */
+    StateTaskParam_t  param;        /* 状態遷移タスクパラメータ */
+    MvfsMsgWriteReq_t *pMsg;        /* メッセージ               */
 
     /* 初期化 */
     errNo     = MLIB_STATE_ERR_NONE;
+    pFdInfo   = NULL;
     retMLib   = MLIB_FAILURE;
     pNode     = NULL;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
-    pMsg      = ( MvfsMsgOpenReq_t * ) pBuffer;
+    pMsg      = ( MvfsMsgWriteReq_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, localFd=%d, path=%s.",
+        "[mvfs][%s:%d] %s() start. taskId=%d, globalFd=%d, writeIdx=0x%X, size=%u",
         __FILE__,
         __LINE__,
         __func__,
         taskId,
-        pMsg->localFd,
-        pMsg->path
+        pMsg->globalFd,
+        ( uint32_t ) pMsg->writeIdx,
+        pMsg->size
     );
 
-    /* 絶対パス判定 */
-    if ( pMsg->path[ 0 ] != '/' ) {
-        /* 絶対パスでない */
+    /* FD情報取得 */
+    pFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( pFdInfo == NULL ) {
+        /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s() error. taskId=%u, path=%s.",
+            "[mvfs][%s:%d] %s(): FD error.",
             __FILE__,
             __LINE__,
-            __func__,
-            taskId,
-            pMsg->path
+            __func__
         );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* write応答メッセージ送信 */
+        SendMsgWriteResp( taskId, MVFS_RESULT_FAILURE, 0 );
 
         return;
     }
@@ -267,10 +291,11 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
     /* 状態遷移パラメータ設定 */
     param.taskId  = taskId;
     param.pBuffer = pBuffer;
+    param.pFdInfo = pFdInfo;
 
     /* 状態遷移実行 */
     retMLib = MLibStateExec( &gStateHdl,
-                             EVENT_OPEN_REQ,
+                             EVENT_WRITE_REQ,
                              &param,
                              &prevState,
                              &nextState,
@@ -281,7 +306,7 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=%#X",
+            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=0x%X",
             __FILE__,
             __LINE__,
             __func__,
@@ -289,8 +314,8 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
             errNo
         );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* write応答メッセージ送信 */
+        SendMsgWriteResp( taskId, MVFS_RESULT_FAILURE, 0 );
 
         return;
     }
@@ -313,47 +338,47 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       open応答メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にopen応答メッセージを送信する。
+ * @brief       write応答メッセージ送信
+ * @details     メッセージ送信先タスクID(dst)にwrite応答メッセージを送信する。
  *
  * @param[in]   dst      メッセージ送信先タスクID
  * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 成功
  *                  - MVFS_RESULT_FAILURE 失敗
- * @param[in]   globalFd グローバルFD
+ * @param[in]   size     書込み実施サイズ
  */
 /******************************************************************************/
-static void SendMsgOpenResp( MkTaskId_t dst,
-                             uint32_t   result,
-                             uint32_t   globalFd )
+static void SendMsgWriteResp( MkTaskId_t dst,
+                              uint32_t   result,
+                              size_t     size      )
 {
-    int32_t           ret;      /* 関数戻り値 */
-    uint32_t          errNo;    /* エラー番号 */
-    MvfsMsgOpenResp_t msg;      /* メッセージ */
+    int32_t            ret;     /* 関数戻り値 */
+    uint32_t           errNo;   /* エラー番号 */
+    MvfsMsgWriteResp_t msg;     /* メッセージ */
 
     /* 初期化 */
     ret   = MK_MSG_RET_FAILURE;
     errNo = MK_MSG_ERR_NONE;
-    memset( &msg, 0, sizeof ( MvfsMsgOpenResp_t ) );
+    memset( &msg, 0, sizeof ( MvfsMsgWriteResp_t ) );
 
     /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_OPEN;
+    msg.header.funcId = MVFS_FUNCID_WRITE;
     msg.header.type   = MVFS_TYPE_RESP;
     msg.result        = result;
-    msg.globalFd      = globalFd;
+    msg.size          = size;
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, result=%u, globalFd=%u.",
+        "[mvfs][%s:%d] %s() dst=%u, result=%u, size=%u.",
         __FILE__,
         __LINE__,
         __func__,
         dst,
         result,
-        globalFd
+        size
     );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgOpenResp_t ), &errNo );
+    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &errNo );
 
     /* 送信結果判定 */
     if ( ret != MK_MSG_RET_SUCCESS ) {
@@ -375,49 +400,55 @@ static void SendMsgOpenResp( MkTaskId_t dst,
 
 /******************************************************************************/
 /**
- * @brief       vfsOpen要求メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にvfsOpen要求メッセージを送信する。
+ * @brief       vfsWrite要求メッセージ送信
+ * @details     メッセージ送信先タスクID(dst)にvfsWrite要求メッセージを送信する。
  *
  * @param[in]   dst      メッセージ送信先タスクID
- * @param[in]   pid      プロセスID
  * @param[in]   globalFd グローバルFD
- * @param[in]   *pPath   ファイルパス（絶対パス）
+ * @param[in]   writeIdx 書込みインデックス
+ * @param[in]   *pBuffer 書込みデータ
+ * @param[in]   size     書込みサイズ
  */
 /******************************************************************************/
-static void SendMsgVfsOpenReq( MkTaskId_t dst,
-                               MkPid_t    pid,
-                               uint32_t   globalFd,
-                               const char *pPath    )
+static void SendMsgVfsWriteReq( MkTaskId_t dst,
+                                uint32_t   globalFd,
+                                uint64_t   writeIdx,
+                                const char *pBuffer,
+                                size_t     size      )
 {
-    int32_t             ret;    /* 関数戻り値 */
-    uint32_t            errNo;  /* エラー番号 */
-    MvfsMsgVfsOpenReq_t msg;    /* メッセージ */
+    int32_t              ret;   /* 関数戻り値 */
+    uint32_t             errNo; /* エラー番号 */
+    MvfsMsgVfsWriteReq_t msg;   /* メッセージ */
 
     /* 初期化 */
     ret   = MK_MSG_RET_FAILURE;
     errNo = MK_MSG_ERR_NONE;
-    memset( &msg, 0, sizeof ( MvfsMsgVfsOpenReq_t ) );
+    memset( &msg, 0, sizeof ( MvfsMsgVfsWriteReq_t ) );
 
     /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_VFSOPEN;
+    msg.header.funcId = MVFS_FUNCID_VFSWRITE;
     msg.header.type   = MVFS_TYPE_REQ;
-    msg.pid           = pid;
     msg.globalFd      = globalFd;
-    strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
+    msg.writeIdx      = writeIdx;
+    msg.size          = size;
+    memcpy( msg.pBuffer, pBuffer, size );
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, pid=%u, globalFd=%u, pPath=%s",
+        "[mvfs][%s:%d] %s() dst=%u, globalFd=%u, writeIdx=0x%X, size=%u",
         __FILE__,
         __LINE__,
         __func__,
         dst,
-        pid,
         globalFd,
-        pPath
+        ( uint32_t ) writeIdx,
+        size
     );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsOpenReq_t ), &errNo );
+    ret = MkMsgSend( dst,
+                     &msg,
+                     sizeof ( MvfsMsgVfsWriteReq_t ) + size,
+                     &errNo                                  );
 
     /* 送信結果判定 */
     if ( ret != MK_MSG_RET_SUCCESS ) {
@@ -440,106 +471,66 @@ static void SendMsgVfsOpenReq( MkTaskId_t dst,
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0101
- * @details     ファイルディスクリプタ払い出しを行い、vfsOpen要求メッセージを送
- *              信する。
+ * @details     vfsWrite要求メッセージを送信する。
  *
  * @param[in]   *pArg 状態遷移パラメータ
  *
  * @return      遷移先状態を返す。
- * @retval      STATE_INI               初期状態
- * @retval      STATE_VFSOPEN_RESP_WAIT vfsOpen応答待ち
+ * @retval      STATE_INI                初期状態
+ * @retval      STATE_VFSWRITE_RESP_WAIT vfsWrite応答待ち
  */
 /******************************************************************************/
 static MLibState_t Task0101( void *pArg )
 {
-    uint32_t         globalFd;  /* グローバルFD       */
-    NodeInfo_t       *pNode;    /* ノード             */
-    StateTaskParam_t *pParam;   /* 状態遷移パラメータ */
-    MvfsMsgOpenReq_t *pMsg;     /* open要求メッセージ */
+    NodeInfo_t        *pNode;   /* ノード             */
+    StateTaskParam_t  *pParam;  /* 状態遷移パラメータ */
+    MvfsMsgWriteReq_t *pMsg;    /* open要求メッセージ */
 
     /* 初期化 */
-    pNode  = NULL;
-    pParam = ( StateTaskParam_t * ) pArg;
-    pMsg   = ( MvfsMsgOpenReq_t * ) pParam->pBuffer;
+    pParam = ( StateTaskParam_t  * ) pArg;
+    pNode  = pParam->pFdInfo->pNode;
+    pMsg   = ( MvfsMsgWriteReq_t * ) pParam->pBuffer;
 
-    /* パスからノード取得 */
-    pNode = NodeGet( pMsg->path );
+    /* vfsWrite要求メッセージ送信 */
+    SendMsgVfsWriteReq( pNode->mountTaskId,
+                        pMsg->globalFd,
+                        pMsg->writeIdx,
+                        pMsg->pBuffer,
+                        pMsg->size          );
 
-    /* 取得結果判定 */
-    if ( pNode == NULL ) {
-        /* ノード無し */
+    /* [TODO]write要求元タスクID保存 */
+    gWriteTaskId = pParam->taskId;
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): not exist. path=%s",
-            __FILE__,
-            __LINE__,
-            __func__,
-            pMsg->path
-        );
-
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
-
-        return STATE_INI;
-    }
-
-    /* ノードタイプチェック */
-    if ( pNode->type != NODE_TYPE_MOUNT_FILE ) {
-        /* マウントファイルでない */
-
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): not mount file. path=%s, type=%u",
-            __FILE__,
-            __LINE__,
-            __func__,
-            pMsg->path,
-            pNode->type
-        );
-
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
-
-        return STATE_INI;
-    }
-
-    /* PID毎のFD払い出し */
-    globalFd = FdAlloc( pMsg->localFd,
-                        MK_TASKID_TO_PID( pParam->taskId ),
-                        pNode                               );
-
-    /* vfsOpen要求メッセージ送信 */
-    SendMsgVfsOpenReq( pNode->mountTaskId,
-                       MK_TASKID_TO_PID( pParam->taskId ),
-                       globalFd,
-                       pMsg->path                          );
-
-    /* [TODO]open要求元タスクID保存 */
-    gOpenTaskId = pParam->taskId;
-    gGlobalFd   = globalFd;
-
-    return STATE_VFSOPEN_RESP_WAIT;
+    return STATE_VFSWRITE_RESP_WAIT;
 }
 
 
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0202
- * @details     open応答メッセージを送信する。
+ * @details     write応答メッセージを送信する。
  *
  * @param[in]   *pArg 未使用
  *
  * @return      遷移先状態を返す。
- * @retval      STATE_INI               初期状態
- * @retval      STATE_VFSOPEN_RESP_WAIT vfsOpen応答待ち
+ * @retval      STATE_INI 初期状態
  */
 /******************************************************************************/
 static MLibState_t Task0202( void *pArg )
 {
-    /* open応答メッセージ送信 */
-    SendMsgOpenResp( gOpenTaskId, MVFS_RESULT_SUCCESS, gGlobalFd );
+    StateTaskParam_t      *pParam; /* 状態遷移パラメータ  */
+    MvfsMsgVfsWriteResp_t *pMsg;   /* vfsWrite応答メッセージ */
+
+    /* 初期化 */
+    pParam = ( StateTaskParam_t      * ) pArg;
+    pMsg   = ( MvfsMsgVfsWriteResp_t * ) pParam->pBuffer;
+
+    /* write応答メッセージ送信 */
+    SendMsgWriteResp( gWriteTaskId, pMsg->result, pMsg->size );
 
     return STATE_INI;
 }
 
 
 /******************************************************************************/
+

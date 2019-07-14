@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fd.c                                                              */
-/*                                                                 2019/06/30 */
+/*                                                                 2019/07/08 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -74,7 +74,7 @@ uint32_t FdAlloc( uint32_t   localFd,
                   MkPid_t    pid,
                   NodeInfo_t *pNode   )
 {
-    uint32_t  idx;     /* インデックス */
+    uint32_t  idx;          /* インデックス */
     FdTable_t *pFdTable;    /* FDテーブル   */
 
     /* 初期化 */
@@ -121,6 +121,57 @@ uint32_t FdAlloc( uint32_t   localFd,
     }
 
     return MVFS_FD_NULL;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       FD情報取得
+ * @details     FD管理テーブルから指定したFDに該当するFD情報を取得する。
+ *
+ * @param[in]   fd ファイルディスクリプタ
+ *
+ * @return      FD情報へのポインタを返す。
+ * @retval      NULL     該当FD情報無し
+ * @retval      NULL以外 該当FD情報
+ */
+/******************************************************************************/
+FdInfo_t *FdGet( uint32_t globalFd )
+{
+    uint32_t  idx;          /* インデックス */
+    FdTable_t *pFdTable;    /* FDテーブル   */
+
+    /* 初期化 */
+    pFdTable = NULL;
+
+    /* FDテーブルエントリ毎に繰り返し */
+    while ( true ) {
+        /* FDテーブル取得 */
+        pFdTable = ( FdTable_t * )
+                   MLibListGetNextNode( &gFdTableList,
+                                        ( MLibListNode_t * ) pFdTable );
+
+        /* 取得結果判定 */
+        if ( pFdTable == NULL ) {
+            /* FDテーブル無し */
+
+            break;
+        }
+
+        /* FD情報毎に繰り返し */
+        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
+              idx <= FDTABLE_ENTRY_IDX_MAX;
+              idx++                         ) {
+            /* グローバルFD比較 */
+            if ( pFdTable->fdInfo[ idx ].globalFd == globalFd ) {
+                /* 該当 */
+
+                return &( pFdTable->fdInfo[ idx ] );
+            }
+        }
+    }
+
+    return NULL;
 }
 
 

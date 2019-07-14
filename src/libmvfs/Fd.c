@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.c                                                           */
-/*                                                                 2019/07/07 */
+/*                                                                 2019/07/11 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -132,6 +132,57 @@ void FdFree( FdInfo_t *pFdInfo )
     pFdInfo->used = false;
 
     return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       FD情報取得
+ * @details     FD管理テーブルから指定したFDに該当するFD情報を取得する。
+ *
+ * @param[in]   localFd ローカルファイルディスクリプタ
+ *
+ * @return      FD情報へのポインタを返す。
+ * @retval      NULL     該当FD情報無し
+ * @retval      NULL以外 該当FD情報
+ */
+/******************************************************************************/
+FdInfo_t *FdGet( uint32_t localFd )
+{
+    uint32_t  idx;          /* インデックス */
+    FdTable_t *pFdTable;    /* FDテーブル   */
+
+    /* 初期化 */
+    pFdTable = NULL;
+
+    /* FDテーブルエントリ毎に繰り返し */
+    while ( true ) {
+        /* FDテーブル取得 */
+        pFdTable = ( FdTable_t * )
+                   MLibListGetNextNode( &gFdTableList,
+                                        ( MLibListNode_t * ) pFdTable );
+
+        /* 取得結果判定 */
+        if ( pFdTable == NULL ) {
+            /* FDテーブル無し */
+
+            break;
+        }
+
+        /* FD情報毎に繰り返し */
+        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
+              idx <= FDTABLE_ENTRY_IDX_MAX;
+              idx++                         ) {
+            /* グローバルFD比較 */
+            if ( pFdTable->fdInfo[ idx ].localFd == localFd ) {
+                /* 該当 */
+
+                return &( pFdTable->fdInfo[ idx ] );
+            }
+        }
+    }
+
+    return NULL;
 }
 
 
