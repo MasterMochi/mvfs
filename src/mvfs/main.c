@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/07/13 */
+/*                                                                 2019/07/15 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -26,6 +26,7 @@
 #include "Mount.h"
 #include "Node.h"
 #include "Open.h"
+#include "Read.h"
 #include "Write.h"
 
 
@@ -53,7 +54,9 @@ static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
       OpenRcvMsgOpenReq,            /* MVFS_FUNCID_OPEN     */
       OpenRcvMsgVfsOpenResp,        /* MVFS_FUNCID_VFSOPEN  */
       WriteRcvMsgWriteReq,          /* MVFS_FUNCID_WRITE    */
-      WriteRcvMsgVfsWriteResp };    /* MVFS_FUNCID_VFSWRITE */
+      WriteRcvMsgVfsWriteResp,      /* MVFS_FUNCID_VFSWRITE */
+      ReadRcvMsgReadReq,            /* MVFS_FUNCID_READ     */
+      ReadRcvMsgVfsReadResp    };   /* MVFS_FUNCID_VFSREAD  */
 
 
 /******************************************************************************/
@@ -73,6 +76,7 @@ void main( void )
     NodeInit();
     OpenInit();
     WriteInit();
+    ReadInit();
 
     /* タスク名登録 */
     ret = MkTaskNameRegister( "VFS", NULL );

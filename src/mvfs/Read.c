@@ -1,6 +1,6 @@
 /******************************************************************************/
 /*                                                                            */
-/* src/mvfs/Write.c                                                           */
+/* src/mvfs/Read.c                                                            */
 /*                                                                 2019/07/15 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
@@ -33,12 +33,12 @@
 /* 定義                                                                       */
 /******************************************************************************/
 /* 状態 */
-#define STATE_INI                ( 1 )  /**< 初期状態     */
-#define STATE_VFSWRITE_RESP_WAIT ( 2 )  /**< vfsWrite待ち */
+#define STATE_INI               ( 1 )   /**< 初期状態    */
+#define STATE_VFSREAD_RESP_WAIT ( 2 )   /**< vfsRead待ち */
 
 /* イベント */
-#define EVENT_WRITE_REQ     ( 1 )   /**< write要求イベント    */
-#define EVENT_VFSWRITE_RESP ( 2 )   /**< vdsWrite応答イベント */
+#define EVENT_READ_REQ     ( 1 )    /**< read要求イベント    */
+#define EVENT_VFSREAD_RESP ( 2 )    /**< vfsRead応答イベント */
 
 /** 状態遷移タスクパラメータ */
 typedef struct {
@@ -51,16 +51,16 @@ typedef struct {
 /******************************************************************************/
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
-/* write応答メッセージ送信 */
-static void SendMsgWriteResp( MkTaskId_t taskId,
-                              uint32_t   result,
-                              size_t     size    );
-/* vfsWrite要求メッセージ送信 */
-static void SendMsgVfsWriteReq( MkTaskId_t dst,
-                                uint32_t   globalFd,
-                                uint64_t   writeIdx,
-                                const char *pBuffer,
-                                size_t     size      );
+/* read応答メッセージ送信 */
+static void SendMsgReadResp( MkTaskId_t taskId,
+                             uint32_t   result,
+                             void       *pBuffer,
+                             size_t     size      );
+/* vfsRead要求メッセージ送信 */
+static void SendMsgVfsReadReq( MkTaskId_t dst,
+                               uint32_t   globalFd,
+                               uint64_t   readIdx,
+                               size_t     size      );
 
 /* 状態遷移タスク */
 static MLibState_t Task0101( void *pArg );
@@ -72,16 +72,16 @@ static MLibState_t Task0202( void *pArg );
 /******************************************************************************/
 /** 状態遷移表 */
 static const MLibStateTransition_t gStt[] = {
-    { STATE_INI               , EVENT_WRITE_REQ    , Task0101, { STATE_VFSWRITE_RESP_WAIT, 0 } },
-    { STATE_INI               , EVENT_VFSWRITE_RESP, NULL    , { STATE_INI               , 0 } },
-    { STATE_VFSWRITE_RESP_WAIT, EVENT_WRITE_REQ    , NULL    , { STATE_VFSWRITE_RESP_WAIT, 0 } },
-    { STATE_VFSWRITE_RESP_WAIT, EVENT_VFSWRITE_RESP, Task0202, { STATE_INI               , 0 } }  };
+    { STATE_INI              , EVENT_READ_REQ    , Task0101, { STATE_VFSREAD_RESP_WAIT, 0 } },
+    { STATE_INI              , EVENT_VFSREAD_RESP, NULL    , { STATE_INI              , 0 } },
+    { STATE_VFSREAD_RESP_WAIT, EVENT_READ_REQ    , NULL    , { STATE_VFSREAD_RESP_WAIT, 0 } },
+    { STATE_VFSREAD_RESP_WAIT, EVENT_VFSREAD_RESP, Task0202, { STATE_INI              , 0 } }  };
 
 /** 状態遷移ハンドル */
 static MLibStateHandle_t gStateHdl;
 
 /* TODO */
-static MkTaskId_t gWriteTaskId;
+static MkTaskId_t gReadTaskId;
 
 
 /******************************************************************************/
@@ -89,11 +89,11 @@ static MkTaskId_t gWriteTaskId;
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       write機能初期化
+ * @brief       read機能初期化
  * @details     状態遷移を初期化する。
  */
 /******************************************************************************/
-void WriteInit( void )
+void ReadInit( void )
 {
     uint32_t  errNo;    /* エラー番号 */
     MLibRet_t ret;      /* MLIB戻り値 */
@@ -129,24 +129,24 @@ void WriteInit( void )
 
 /******************************************************************************/
 /**
- * @brief       vfsWrite応答メッセージ受信
- * @details     メッセージ送信元タスクID(taskId)からのvfsWrite応答メッセージを
- *              処理する。
+ * @brief       vfsRead応答メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのvfsRead応答メッセージを処
+ *              理する。
  *
  * @param[in]   taskId   メッセージ送信元タスクID
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
-                              void       *pBuffer )
+void ReadRcvMsgVfsReadResp( MkTaskId_t taskId,
+                            void       *pBuffer )
 {
-    uint32_t              errNo;        /* エラー番号               */
-    FdInfo_t              *pFdInfo;     /* FD情報                   */
-    MLibRet_t             retMLib;      /* MLIB戻り値               */
-    MLibState_t           prevState;    /* 遷移前状態               */
-    MLibState_t           nextState;    /* 遷移後状態               */
-    StateTaskParam_t      param;        /* 状態遷移タスクパラメータ */
-    MvfsMsgVfsWriteResp_t *pMsg;        /* メッセージ               */
+    uint32_t             errNo;     /* エラー番号               */
+    FdInfo_t             *pFdInfo;  /* FD情報                   */
+    MLibRet_t            retMLib;   /* MLIB戻り値               */
+    MLibState_t          prevState; /* 遷移前状態               */
+    MLibState_t          nextState; /* 遷移後状態               */
+    StateTaskParam_t     param;     /* 状態遷移タスクパラメータ */
+    MvfsMsgVfsReadResp_t *pMsg;     /* メッセージ               */
 
     /* 初期化 */
     errNo     = MLIB_STATE_ERR_NONE;
@@ -154,7 +154,7 @@ void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
     retMLib   = MLIB_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
-    pMsg      = ( MvfsMsgVfsWriteResp_t * ) pBuffer;
+    pMsg      = ( MvfsMsgVfsReadResp_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
     LibMlogPut(
@@ -191,11 +191,11 @@ void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
 
     /* 状態遷移実行 */
     retMLib = MLibStateExec( &gStateHdl,
-                             EVENT_VFSWRITE_RESP,
+                             EVENT_VFSREAD_RESP,
                              &param,
                              &prevState,
                              &nextState,
-                             &errNo               );
+                             &errNo              );
 
     /* 実行結果判定 */
     if ( retMLib != MLIB_SUCCESS ) {
@@ -228,25 +228,25 @@ void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
 
 /******************************************************************************/
 /**
- * @brief       write要求メッセージ受信
- * @details     メッセージ送信元タスクID(taskId)からのwrite要求メッセージを処理
+ * @brief       read要求メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのread要求メッセージを処理
  *              する。
  *
  * @param[in]   taskId   メッセージ送信元タスクID
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void WriteRcvMsgWriteReq( MkTaskId_t taskId,
-                          void       *pBuffer )
+void ReadRcvMsgReadReq( MkTaskId_t taskId,
+                        void       *pBuffer )
 {
-    uint32_t          errNo;        /* エラー番号               */
-    FdInfo_t          *pFdInfo;     /* FD情報                   */
-    MLibRet_t         retMLib;      /* MLIB戻り値               */
-    NodeInfo_t        *pNode;       /* ノード                   */
-    MLibState_t       prevState;    /* 遷移前状態               */
-    MLibState_t       nextState;    /* 遷移後状態               */
-    StateTaskParam_t  param;        /* 状態遷移タスクパラメータ */
-    MvfsMsgWriteReq_t *pMsg;        /* メッセージ               */
+    uint32_t         errNo;     /* エラー番号               */
+    FdInfo_t         *pFdInfo;  /* FD情報                   */
+    MLibRet_t        retMLib;   /* MLIB戻り値               */
+    NodeInfo_t       *pNode;    /* ノード                   */
+    MLibState_t      prevState; /* 遷移前状態               */
+    MLibState_t      nextState; /* 遷移後状態               */
+    StateTaskParam_t param;     /* 状態遷移タスクパラメータ */
+    MvfsMsgReadReq_t *pMsg;     /* メッセージ               */
 
     /* 初期化 */
     errNo     = MLIB_STATE_ERR_NONE;
@@ -255,17 +255,17 @@ void WriteRcvMsgWriteReq( MkTaskId_t taskId,
     pNode     = NULL;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
-    pMsg      = ( MvfsMsgWriteReq_t * ) pBuffer;
+    pMsg      = ( MvfsMsgReadReq_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
     LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, globalFd=%d, writeIdx=0x%X, size=%u",
+        "[mvfs][%s:%d] %s() start. taskId=%d, globalFd=%d, readIdx=0x%X, size=%u",
         __FILE__,
         __LINE__,
         __func__,
         taskId,
         pMsg->globalFd,
-        ( uint32_t ) pMsg->writeIdx,
+        ( uint32_t ) pMsg->readIdx,
         pMsg->size
     );
 
@@ -283,8 +283,8 @@ void WriteRcvMsgWriteReq( MkTaskId_t taskId,
             __func__
         );
 
-        /* write応答メッセージ送信 */
-        SendMsgWriteResp( taskId, MVFS_RESULT_FAILURE, 0 );
+        /* read応答メッセージ送信 */
+        SendMsgReadResp( taskId, MVFS_RESULT_FAILURE, NULL, 0 );
 
         return;
     }
@@ -296,7 +296,7 @@ void WriteRcvMsgWriteReq( MkTaskId_t taskId,
 
     /* 状態遷移実行 */
     retMLib = MLibStateExec( &gStateHdl,
-                             EVENT_WRITE_REQ,
+                             EVENT_READ_REQ,
                              &param,
                              &prevState,
                              &nextState,
@@ -315,8 +315,8 @@ void WriteRcvMsgWriteReq( MkTaskId_t taskId,
             errNo
         );
 
-        /* write応答メッセージ送信 */
-        SendMsgWriteResp( taskId, MVFS_RESULT_FAILURE, 0 );
+        /* read応答メッセージ送信 */
+        SendMsgReadResp( taskId, MVFS_RESULT_FAILURE, NULL, 0 );
 
         return;
     }
@@ -339,34 +339,29 @@ void WriteRcvMsgWriteReq( MkTaskId_t taskId,
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       write応答メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にwrite応答メッセージを送信する。
+ * @brief       read応答メッセージ送信
+ * @details     メッセージ送信先タスクID(dst)にread応答メッセージを送信する。
  *
- * @param[in]   dst    メッセージ送信先タスクID
- * @param[in]   result 処理結果
+ * @param[in]   dst      メッセージ送信先タスクID
+ * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 成功
  *                  - MVFS_RESULT_FAILURE 失敗
- * @param[in]   size   書込み実施サイズ
+ * @param[in]   *pBuffer 読込みバッファ
+ * @param[in]   size     読込み実施サイズ
  */
 /******************************************************************************/
-static void SendMsgWriteResp( MkTaskId_t dst,
-                              uint32_t   result,
-                              size_t     size      )
+static void SendMsgReadResp( MkTaskId_t dst,
+                             uint32_t   result,
+                             void       *pBuffer,
+                             size_t     size      )
 {
-    int32_t            ret;     /* 関数戻り値 */
-    uint32_t           errNo;   /* エラー番号 */
-    MvfsMsgWriteResp_t msg;     /* メッセージ */
+    int32_t           ret;      /* 関数戻り値 */
+    uint32_t          errNo;    /* エラー番号 */
+    MvfsMsgReadResp_t *pMsg;    /* メッセージ */
 
     /* 初期化 */
     ret   = MK_MSG_RET_FAILURE;
     errNo = MK_MSG_ERR_NONE;
-    memset( &msg, 0, sizeof ( MvfsMsgWriteResp_t ) );
-
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_WRITE;
-    msg.header.type   = MVFS_TYPE_RESP;
-    msg.result        = result;
-    msg.size          = size;
 
     LibMlogPut(
         "[mvfs][%s:%d] %s() dst=%u, result=%u, size=%u.",
@@ -378,68 +373,8 @@ static void SendMsgWriteResp( MkTaskId_t dst,
         size
     );
 
-    /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &errNo );
-
-    /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
-        /* 失敗 */
-
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            errNo
-        );
-    }
-
-    return;
-}
-
-
-/******************************************************************************/
-/**
- * @brief       vfsWrite要求メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にvfsWrite要求メッセージを送信する。
- *
- * @param[in]   dst      メッセージ送信先タスクID
- * @param[in]   globalFd グローバルFD
- * @param[in]   writeIdx 書込みインデックス
- * @param[in]   *pBuffer 書込みデータ
- * @param[in]   size     書込みサイズ
- */
-/******************************************************************************/
-static void SendMsgVfsWriteReq( MkTaskId_t dst,
-                                uint32_t   globalFd,
-                                uint64_t   writeIdx,
-                                const char *pBuffer,
-                                size_t     size      )
-{
-    uint8_t              buffer[ MK_MSG_SIZE_MAX ]; /* バッファ   */
-    int32_t              ret;                       /* 関数戻り値 */
-    uint32_t             errNo;                     /* エラー番号 */
-    MvfsMsgVfsWriteReq_t *pMsg;                     /* メッセージ */
-
-    /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
-    pMsg  = ( MvfsMsgVfsWriteReq_t * ) buffer;
-
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, globalFd=%u, writeIdx=0x%X, size=%u",
-        __FILE__,
-        __LINE__,
-        __func__,
-        dst,
-        globalFd,
-        ( uint32_t ) writeIdx,
-        size
-    );
-
     /* バッファ確保 */
-    pMsg = malloc( sizeof ( MvfsMsgVfsWriteReq_t ) + size );
+    pMsg = malloc( sizeof ( MvfsMsgReadResp_t ) + size );
 
     /* 確保結果判定 */
     if ( pMsg == NULL ) {
@@ -456,21 +391,24 @@ static void SendMsgVfsWriteReq( MkTaskId_t dst,
     }
 
     /* バッファ初期化 */
-    memset( pMsg, 0, sizeof ( MvfsMsgVfsWriteReq_t ) + size );
+    memset( pMsg, 0, sizeof ( MvfsMsgReadResp_t ) + size );
 
     /* メッセージ設定 */
-    pMsg->header.funcId = MVFS_FUNCID_VFSWRITE;
-    pMsg->header.type   = MVFS_TYPE_REQ;
-    pMsg->globalFd      = globalFd;
-    pMsg->writeIdx      = writeIdx;
+    pMsg->header.funcId = MVFS_FUNCID_READ;
+    pMsg->header.type   = MVFS_TYPE_RESP;
+    pMsg->result        = result;
     pMsg->size          = size;
-    memcpy( pMsg->pBuffer, pBuffer, size );
+
+    /* 読込みバッファ有無チェック */
+    if ( pBuffer != NULL ) {
+        /* 有り */
+
+        /* 読込みバッファコピー */
+        memcpy( pMsg->pBuffer, pBuffer, size );
+    }
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst,
-                     pMsg,
-                     sizeof ( MvfsMsgVfsWriteReq_t ) + size,
-                     &errNo                                  );
+    ret = MkMsgSend( dst, pMsg, sizeof ( MvfsMsgReadResp_t ) + size, &errNo );
 
     /* 送信結果判定 */
     if ( ret != MK_MSG_RET_SUCCESS ) {
@@ -495,45 +433,108 @@ static void SendMsgVfsWriteReq( MkTaskId_t dst,
 
 /******************************************************************************/
 /**
+ * @brief       vfsRead要求メッセージ送信
+ * @details     メッセージ送信先タスクID(dst)にvfsRead要求メッセージを送信する。
+ *
+ * @param[in]   dst      メッセージ送信先タスクID
+ * @param[in]   globalFd グローバルFD
+ * @param[in]   readIdx  書込みインデックス
+ * @param[in]   size     書込みサイズ
+ */
+/******************************************************************************/
+static void SendMsgVfsReadReq( MkTaskId_t dst,
+                               uint32_t   globalFd,
+                               uint64_t   readIdx,
+                               size_t     size      )
+{
+    int32_t             ret;    /* 関数戻り値 */
+    uint32_t            errNo;  /* エラー番号 */
+    MvfsMsgVfsReadReq_t msg;    /* メッセージ */
+
+    /* 初期化 */
+    ret   = MK_MSG_RET_FAILURE;
+    errNo = MK_MSG_ERR_NONE;
+    memset( &msg, 0, sizeof ( MvfsMsgVfsReadReq_t ) );
+
+    /* メッセージ設定 */
+    msg.header.funcId = MVFS_FUNCID_VFSREAD;
+    msg.header.type   = MVFS_TYPE_REQ;
+    msg.globalFd      = globalFd;
+    msg.readIdx       = readIdx;
+    msg.size          = size;
+
+    LibMlogPut(
+        "[mvfs][%s:%d] %s() dst=%u, globalFd=%u, readIdx=0x%X, size=%u",
+        __FILE__,
+        __LINE__,
+        __func__,
+        dst,
+        globalFd,
+        ( uint32_t ) readIdx,
+        size
+    );
+
+    /* メッセージ送信 */
+    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsReadReq_t ), &errNo );
+
+    /* 送信結果判定 */
+    if ( ret != MK_MSG_RET_SUCCESS ) {
+        /* 失敗 */
+
+        LibMlogPut(
+            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
+            __FILE__,
+            __LINE__,
+            __func__,
+            ret,
+            errNo
+        );
+    }
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
  * @brief       状態遷移タスク0101
- * @details     vfsWrite要求メッセージを送信する。
+ * @details     vfsRead要求メッセージを送信する。
  *
  * @param[in]   *pArg 状態遷移パラメータ
  *
  * @return      遷移先状態を返す。
- * @retval      STATE_INI                初期状態
- * @retval      STATE_VFSWRITE_RESP_WAIT vfsWrite応答待ち
+ * @retval      STATE_INI               初期状態
+ * @retval      STATE_VFSREAD_RESP_WAIT vfsRead応答待ち
  */
 /******************************************************************************/
 static MLibState_t Task0101( void *pArg )
 {
-    NodeInfo_t        *pNode;   /* ノード             */
-    StateTaskParam_t  *pParam;  /* 状態遷移パラメータ */
-    MvfsMsgWriteReq_t *pMsg;    /* read要求メッセージ */
+    NodeInfo_t       *pNode;    /* ノード             */
+    StateTaskParam_t *pParam;   /* 状態遷移パラメータ */
+    MvfsMsgReadReq_t *pMsg;     /* read要求メッセージ */
 
     /* 初期化 */
     pParam = ( StateTaskParam_t  * ) pArg;
     pNode  = pParam->pFdInfo->pNode;
-    pMsg   = ( MvfsMsgWriteReq_t * ) pParam->pBuffer;
+    pMsg   = ( MvfsMsgReadReq_t * ) pParam->pBuffer;
 
-    /* vfsWrite要求メッセージ送信 */
-    SendMsgVfsWriteReq( pNode->mountTaskId,
-                        pMsg->globalFd,
-                        pMsg->writeIdx,
-                        pMsg->pBuffer,
-                        pMsg->size          );
+    /* vfsRead要求メッセージ送信 */
+    SendMsgVfsReadReq( pNode->mountTaskId,
+                       pMsg->globalFd,
+                       pMsg->readIdx,
+                       pMsg->size          );
 
-    /* [TODO]write要求元タスクID保存 */
-    gWriteTaskId = pParam->taskId;
+    /* [TODO]read要求元タスクID保存 */
+    gReadTaskId = pParam->taskId;
 
-    return STATE_VFSWRITE_RESP_WAIT;
+    return STATE_VFSREAD_RESP_WAIT;
 }
 
 
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0202
- * @details     write応答メッセージを送信する。
+ * @details     read応答メッセージを送信する。
  *
  * @param[in]   *pArg 未使用
  *
@@ -543,15 +544,15 @@ static MLibState_t Task0101( void *pArg )
 /******************************************************************************/
 static MLibState_t Task0202( void *pArg )
 {
-    StateTaskParam_t      *pParam; /* 状態遷移パラメータ  */
-    MvfsMsgVfsWriteResp_t *pMsg;   /* vfsWrite応答メッセージ */
+    StateTaskParam_t     *pParam;  /* 状態遷移パラメータ    */
+    MvfsMsgVfsReadResp_t *pMsg;    /* vfsRead応答メッセージ */
 
     /* 初期化 */
-    pParam = ( StateTaskParam_t      * ) pArg;
-    pMsg   = ( MvfsMsgVfsWriteResp_t * ) pParam->pBuffer;
+    pParam = ( StateTaskParam_t     * ) pArg;
+    pMsg   = ( MvfsMsgVfsReadResp_t * ) pParam->pBuffer;
 
-    /* write応答メッセージ送信 */
-    SendMsgWriteResp( gWriteTaskId, pMsg->result, pMsg->size );
+    /* read応答メッセージ送信 */
+    SendMsgReadResp( gReadTaskId, pMsg->result, pMsg->pBuffer, pMsg->size );
 
     return STATE_INI;
 }

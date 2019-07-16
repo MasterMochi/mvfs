@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/include/mvfs.h                                                         */
-/*                                                                 2019/07/11 */
+/*                                                                 2019/07/14 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -27,7 +27,9 @@
 #define MVFS_FUNCID_VFSOPEN  ( 2 )  /**< vfsOpen      */
 #define MVFS_FUNCID_WRITE    ( 3 )  /**< write        */
 #define MVFS_FUNCID_VFSWRITE ( 4 )  /**< vfsWrite     */
-#define MVFS_FUNCID_MAX      ( 4 )  /**< 機能ID最大値 */
+#define MVFS_FUNCID_READ     ( 5 )  /**< read         */
+#define MVFS_FUNCID_VFSREAD  ( 6 )  /**< vfsRead      */
+#define MVFS_FUNCID_MAX      ( 6 )  /**< 機能ID最大値 */
 #define MVFS_FUNCID_NUM      \
     ( MVFS_FUNCID_MAX + 1 )         /**< 機能数       */
 
@@ -61,6 +63,10 @@ typedef struct {
     uint32_t type;      /**< タイプ */
 } MvfsMsgHdr_t;
 
+
+/*-------*/
+/* mount */
+/*-------*/
 /** mount要求メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;                        /**< メッセージヘッダ */
@@ -73,6 +79,10 @@ typedef struct {
     uint32_t     result;    /**< 処理結果         */
 } MvfsMsgMountResp_t;
 
+
+/*------*/
+/* open */
+/*------*/
 /** open要求メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;                        /**< メッセージヘッダ */
@@ -87,6 +97,10 @@ typedef struct {
     uint32_t     globalFd;  /**< グローバルFD     */
 } MvfsMsgOpenResp_t;
 
+
+/*---------*/
+/* vfsOpen */
+/*---------*/
 /** vfsOpen要求メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;                        /**< メッセージヘッダ */
@@ -101,13 +115,17 @@ typedef struct {
     uint32_t     result;    /**< 処理結果         */
 } MvfsMsgVfsOpenResp_t;
 
+
+/*-------*/
+/* write */
+/*-------*/
 /** write要求メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
     uint32_t     globalFd;      /**< グローバルFD       */
     uint64_t     writeIdx;      /**< 書込みインデックス */
     size_t       size;          /**< 書込みサイズ       */
-    char         pBuffer[];     /**< データ             */
+    char         pBuffer[];     /**< 書込みバッファ     */
 } MvfsMsgWriteReq_t;
 
 /** write応答メッセージ */
@@ -117,13 +135,17 @@ typedef struct {
     size_t       size;          /**< 書込み実施サイズ */
 } MvfsMsgWriteResp_t;
 
+
+/*----------*/
+/* vfsWrite */
+/*----------*/
 /** vfsWrite要求メッセージ */
 typedef struct {
     MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
     uint32_t     globalFd;      /**< グローバルFD       */
     uint64_t     writeIdx;      /**< 書込みインデックス */
     size_t       size;          /**< 書込みサイズ       */
-    char         pBuffer[];     /**< データ             */
+    char         pBuffer[];     /**< 書込みバッファ     */
 } MvfsMsgVfsWriteReq_t;
 
 /** vfsWrite応答メッセージ */
@@ -133,6 +155,47 @@ typedef struct {
     uint32_t     result;        /**< 処理結果         */
     size_t       size;          /**< 書込み実施サイズ */
 } MvfsMsgVfsWriteResp_t;
+
+
+/*------*/
+/* read */
+/*------*/
+/** read要求メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
+    uint32_t     globalFd;      /**< グローバルFD       */
+    uint64_t     readIdx;       /**< 読込みインデックス */
+    size_t       size;          /**< 読込みサイズ       */
+} MvfsMsgReadReq_t;
+
+/** read応答メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ */
+    uint32_t     result;        /**< 処理結果         */
+    size_t       size;          /**< 読込み実施サイズ */
+    char         pBuffer[];     /**< 読込みバッファ   */
+} MvfsMsgReadResp_t;
+
+
+/*---------*/
+/* vfsRead */
+/*---------*/
+/** vfsRead要求メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ   */
+    uint32_t     globalFd;      /**< グローバルFD       */
+    uint64_t     readIdx;       /**< 読込みインデックス */
+    size_t       size;          /**< 読込みサイズ       */
+} MvfsMsgVfsReadReq_t;
+
+/** vfsRead応答メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ */
+    uint32_t     globalFd;      /**< グローバルFD     */
+    uint32_t     result;        /**< 処理結果         */
+    size_t       size;          /**< 読込み実施サイズ */
+    char         pBuffer[];     /**< 読込みバッファ   */
+} MvfsMsgVfsReadResp_t;
 
 
 /******************************************************************************/

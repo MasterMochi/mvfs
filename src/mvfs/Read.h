@@ -1,12 +1,12 @@
 /******************************************************************************/
 /*                                                                            */
-/* src/mvfs/Write.h                                                           */
+/* src/mvfs/Read.h                                                            */
 /*                                                                 2019/07/14 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
-#ifndef WRITE_H
-#define WRITE_H
+#ifndef READ_H
+#define READ_H
 /******************************************************************************/
 /* インクルード                                                               */
 /******************************************************************************/
@@ -17,14 +17,14 @@
 /******************************************************************************/
 /* グローバル関数宣言                                                         */
 /******************************************************************************/
-/* Write機能初期化 */
-extern void WriteInit( void );
-/* vfsWrite応答メッセージ受信 */
-extern void WriteRcvMsgVfsWriteResp( MkTaskId_t taskId,
-                                     void       *pBuffer );
-/* writeメッセージ受信 */
-extern void WriteRcvMsgWriteReq( MkTaskId_t taskId,
-                                 void       *pBuffer );
+/* Read機能初期化 */
+extern void ReadInit( void );
+/* vfsRead応答メッセージ受信 */
+extern void ReadRcvMsgVfsReadResp( MkTaskId_t taskId,
+                                   void       *pBuffer );
+/* readメッセージ受信 */
+extern void ReadRcvMsgReadReq( MkTaskId_t taskId,
+                               void       *pBuffer );
 
 
 /******************************************************************************/

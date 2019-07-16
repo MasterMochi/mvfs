@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/07/11 */
+/*                                                                 2019/07/14 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -44,6 +44,9 @@ static void ProcVfsOpenReq( LibMvfsSchedInfo_t  *pInfo,
 /* vfsWrite要求メッセージ処理 */
 static void ProcVfsWriteReq( LibMvfsSchedInfo_t   *pInfo,
                              MvfsMsgVfsWriteReq_t *pMsg   );
+/* vfsRead要求メッセージ処理 */
+static void ProcVfsReadReq( LibMvfsSchedInfo_t  *pInfo,
+                            MvfsMsgVfsReadReq_t *pMsg   );
 
 
 /******************************************************************************/
@@ -189,6 +192,13 @@ static void Proc( LibMvfsSchedInfo_t *pInfo,
 
         /* vfsWrite要求処理 */
         ProcVfsWriteReq( pInfo, ( MvfsMsgVfsWriteReq_t * ) pMsg );
+
+    } else if ( ( pMsg->funcId == MVFS_FUNCID_VFSREAD ) &&
+                ( pMsg->type   == MVFS_TYPE_REQ       )    ) {
+        /* vfsRead要求 */
+
+        /* vfsRead要求処理 */
+        ProcVfsReadReq( pInfo, ( MvfsMsgVfsReadReq_t * ) pMsg );
     }
 
     return;
@@ -285,6 +295,43 @@ static void ProcVfsWriteReq( LibMvfsSchedInfo_t   *pInfo,
 
         /* vfsWrite応答送信 */
         LibMvfsSendVfsWriteResp( pMsg->globalFd, MVFS_RESULT_FAILURE, 0, NULL );
+    }
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsRead要求メッセージ処理
+ * @details     vfsRead要求コールバック関数を呼び出す。コールバック関数が設定さ
+ *              れていない場合は、vfsRead応答を行う。
+ *
+ * @param[in]   *pInfo スケジューラ情報
+ * @param[in]   *pMsg  受信メッセージ
+ */
+/******************************************************************************/
+static void ProcVfsReadReq( LibMvfsSchedInfo_t  *pInfo,
+                            MvfsMsgVfsReadReq_t *pMsg   )
+{
+    /* コールバック関数設定判定 */
+    if ( pInfo->callBack.pVfsRead != NULL ) {
+        /* 設定有り */
+
+        /* コールバック */
+        ( pInfo->callBack.pVfsRead )( pMsg->globalFd,
+                                      pMsg->readIdx,
+                                      pMsg->size      );
+
+    } else {
+        /* 設定無し */
+
+        /* vfsRead応答送信 */
+        LibMvfsSendVfsReadResp( pMsg->globalFd,
+                                MVFS_RESULT_FAILURE,
+                                NULL,
+                                0,
+                                NULL                 );
     }
 
     return;
