@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fd.h                                                              */
-/*                                                                 2019/07/08 */
+/*                                                                 2019/07/20 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -40,6 +40,8 @@ typedef struct {
 extern uint32_t FdAlloc( uint32_t   localFd,
                          MkPid_t    pid,
                          NodeInfo_t *pNode   );
+/* FD解放 */
+extern void FdFree( FdInfo_t *pFdInfo );
 /* FD情報取得 */
 extern FdInfo_t *FdGet( uint32_t globalFd );
 /* FD管理初期化 */

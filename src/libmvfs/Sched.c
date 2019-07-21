@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/07/14 */
+/*                                                                 2019/07/20 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -33,6 +33,9 @@
 /* 仮想ファイルサーバメッセージ処理 */
 static void Proc( LibMvfsSchedInfo_t *pInfo,
                   MvfsMsgHdr_t       *pMsg   );
+/* vfsClose要求メッセージ処理 */
+static void ProcVfsCloseReq( LibMvfsSchedInfo_t   *pInfo,
+                             MvfsMsgVfsCloseReq_t *pMsg   );
 /* その他メッセージ処理 */
 static void ProcOther( LibMvfsSchedInfo_t *pInfo,
                        MkTaskId_t         src,
@@ -199,6 +202,44 @@ static void Proc( LibMvfsSchedInfo_t *pInfo,
 
         /* vfsRead要求処理 */
         ProcVfsReadReq( pInfo, ( MvfsMsgVfsReadReq_t * ) pMsg );
+
+    } else if ( ( pMsg->funcId == MVFS_FUNCID_VFSCLOSE ) &&
+                ( pMsg->type   == MVFS_TYPE_REQ        )    ) {
+        /* vfsClose要求 */
+
+        /* vfsClose要求処理 */
+        ProcVfsCloseReq( pInfo, ( MvfsMsgVfsCloseReq_t * ) pMsg );
+    }
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsClose要求メッセージ処理
+ * @details     vfsClose要求コールバック関数を呼び出す。コールバック関数が設定
+ *              されていない場合は、vfsClose応答を行う。
+ *
+ * @param[in]   *pInfo スケジューラ情報
+ * @param[in]   *pMsg  受信メッセージ
+ */
+/******************************************************************************/
+static void ProcVfsCloseReq( LibMvfsSchedInfo_t   *pInfo,
+                             MvfsMsgVfsCloseReq_t *pMsg   )
+{
+    /* コールバック関数設定判定 */
+    if ( pInfo->callBack.pVfsClose != NULL ) {
+        /* 設定有り */
+
+        /* コールバック */
+        ( pInfo->callBack.pVfsClose )( pMsg->globalFd );
+
+    } else {
+        /* 設定無し */
+
+        /* vfsClose応答送信 */
+        LibMvfsSendVfsCloseResp( pMsg->globalFd, MVFS_RESULT_SUCCESS, NULL );
     }
 
     return;

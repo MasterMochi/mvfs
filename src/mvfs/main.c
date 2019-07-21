@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/07/15 */
+/*                                                                 2019/07/20 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -23,6 +23,7 @@
 #include <mvfs.h>
 
 /* モジュールヘッダ */
+#include "Close.h"
 #include "Mount.h"
 #include "Node.h"
 #include "Open.h"
@@ -56,7 +57,9 @@ static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
       WriteRcvMsgWriteReq,          /* MVFS_FUNCID_WRITE    */
       WriteRcvMsgVfsWriteResp,      /* MVFS_FUNCID_VFSWRITE */
       ReadRcvMsgReadReq,            /* MVFS_FUNCID_READ     */
-      ReadRcvMsgVfsReadResp    };   /* MVFS_FUNCID_VFSREAD  */
+      ReadRcvMsgVfsReadResp,        /* MVFS_FUNCID_VFSREAD  */
+      CloseRcvMsgCloseReq,          /* MVFS_FUNCID_CLOSE    */
+      CloseRcvMsgVfsCloseResp  };   /* MVFS_FUNCID_VFSCLOSE */
 
 
 /******************************************************************************/
@@ -77,6 +80,7 @@ void main( void )
     OpenInit();
     WriteInit();
     ReadInit();
+    CloseInit();
 
     /* タスク名登録 */
     ret = MkTaskNameRegister( "VFS", NULL );

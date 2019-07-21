@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2019/07/15 */
+/*                                                                 2019/07/20 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -45,6 +45,7 @@ typedef
     ( MkTaskId_t src,           /* 送信元タスクID   */
       void       *pMsg,         /* 受信メッセージ   */
       size_t     size   );      /* 受信メッセージ長 */
+
 /** vfsOpen要求コールバック関数型 */
 typedef
     void
@@ -70,11 +71,18 @@ typedef
       uint64_t readIdx,     /* 書込みインデックス */
       size_t   size      ); /* 書込みサイズ       */
 
+/** vfsClose要求コールバック関数型 */
+typedef
+    void
+    ( *LibMvfsFuncVfsClose_t )
+    ( uint32_t globalFd );  /* グローバルFD */
+
 /** スケジューラコールバック関数リスト */
 typedef struct {
     LibMvfsFuncVfsOpen_t  pVfsOpen;     /**< vfsOpen要求      */
     LibMvfsFuncVfsWrite_t pVfsWrite;    /**< vfsWrite要求     */
     LibMvfsFuncVfsRead_t  pVfsRead;     /**< vfsRead要求      */
+    LibMvfsFuncVfsClose_t pVfsClose;    /**< vfsClose要求     */
     LibMvfsFuncOther_t    pOther;       /**< その他メッセージ */
 } LibMvfsSchedCallBack_t;
 
@@ -87,6 +95,9 @@ typedef struct {
 /******************************************************************************/
 /* ライブラリ関数定義                                                         */
 /******************************************************************************/
+/* Close */
+extern LibMvfsRet_t LibMvfsClose( uint32_t fd,
+                                  uint32_t *pErrNo );
 /* TaskID取得 */
 extern LibMvfsRet_t LibMvfsGetTaskId( MkTaskId_t *pTaskId,
                                       uint32_t   *pErrNo   );
@@ -106,6 +117,10 @@ extern LibMvfsRet_t LibMvfsRead( uint32_t fd,
 /* スケジュール開始 */
 extern LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
                                        uint32_t           *pErrNo );
+/* vfsClose応答メッセージ送信 */
+extern LibMvfsRet_t LibMvfsSendVfsCloseResp( uint32_t globalFd,
+                                             uint32_t result,
+                                             uint32_t *pErrNo   );
 /* vfsOpen応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
                                             uint32_t *pErrNo );

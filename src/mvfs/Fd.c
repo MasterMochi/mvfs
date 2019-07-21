@@ -126,6 +126,26 @@ uint32_t FdAlloc( uint32_t   localFd,
 
 /******************************************************************************/
 /**
+ * @brief       FD解放
+ * @details     FDを解放する。
+ *
+ * @param[in]   *pFdInfo FD情報
+ */
+/******************************************************************************/
+void FdFree( FdInfo_t *pFdInfo )
+{
+    /* FD情報初期化 */
+    pFdInfo->used = false;
+    pFdInfo->localFd = MVFS_FD_NULL;
+    pFdInfo->pid     = MK_PID_NULL;
+    pFdInfo->pNode   = NULL;
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
  * @brief       FD情報取得
  * @details     FD管理テーブルから指定したFDに該当するFD情報を取得する。
  *
