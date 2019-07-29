@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Send.c                                                         */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -19,7 +19,7 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmvfs.h>
 #include <MLib/MLib.h>
 
@@ -322,13 +322,13 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
                                       uint32_t   result,
                                       uint32_t   *pErrNo   )
 {
-    int32_t               ret;      /* カーネル戻り値     */
-    uint32_t              errNo;    /* カーネルエラー番号 */
+    MkRet_t               ret;      /* カーネル戻り値     */
+    MkErr_t               err;      /* カーネルエラー内容 */
     MvfsMsgVfsCloseResp_t msg;      /* 応答メッセージ     */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( msg ) );
 
     /* メッセージ作成 */
@@ -338,23 +338,23 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
     msg.result        = result;
 
     /* メッセージ送信 */
-    ret = MkMsgSend( taskId,            /* 送信先タスクID   */
-                     &msg,              /* 送信メッセージ   */
-                     sizeof ( msg ),    /* 送信メッセージ長 */
-                     &errNo          ); /* エラー番号       */
+    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
+                        &msg,              /* 送信メッセージ   */
+                        sizeof ( msg ),    /* 送信メッセージ長 */
+                        &err            ); /* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
@@ -398,13 +398,13 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
                                      uint32_t   result,
                                      uint32_t   *pErrNo )
 {
-    int32_t              ret;   /* カーネル戻り値     */
-    uint32_t             errNo; /* カーネルエラー番号 */
+    MkRet_t              ret;   /* カーネル戻り値     */
+    MkErr_t              err;   /* カーネルエラー内容 */
     MvfsMsgVfsOpenResp_t msg;   /* 応答メッセージ     */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( msg ) );
 
     /* メッセージ作成 */
@@ -413,23 +413,23 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
     msg.result        = result;
 
     /* メッセージ送信 */
-    ret = MkMsgSend( taskId,            /* 送信先タスクID   */
-                     &msg,              /* 送信メッセージ   */
-                     sizeof ( msg ),    /* 送信メッセージ長 */
-                     &errNo          ); /* エラー番号       */
+    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
+                        &msg,              /* 送信メッセージ   */
+                        sizeof ( msg ),    /* 送信メッセージ長 */
+                        &err            ); /* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
@@ -477,13 +477,13 @@ static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
                                       size_t     size,
                                       uint32_t   *pErrNo   )
 {
-    int32_t               ret;      /* カーネル戻り値     */
-    uint32_t              errNo;    /* カーネルエラー番号 */
+    MkRet_t               ret;      /* カーネル戻り値     */
+    MkErr_t               err;      /* カーネルエラー内容 */
     MvfsMsgVfsWriteResp_t msg;      /* 応答メッセージ     */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( msg ) );
 
     /* メッセージ作成 */
@@ -494,23 +494,23 @@ static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
     msg.size          = size;
 
     /* メッセージ送信 */
-    ret = MkMsgSend( taskId,            /* 送信先タスクID   */
-                     &msg,              /* 送信メッセージ   */
-                     sizeof ( msg ),    /* 送信メッセージ長 */
-                     &errNo          ); /* エラー番号       */
+    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
+                        &msg,              /* 送信メッセージ   */
+                        sizeof ( msg ),    /* 送信メッセージ長 */
+                        &err            ); /* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
@@ -560,13 +560,13 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      size_t     size,
                                      uint32_t   *pErrNo   )
 {
-    int32_t              ret;   /* カーネル戻り値     */
-    uint32_t             errNo; /* カーネルエラー番号 */
+    MkRet_t              ret;   /* カーネル戻り値     */
+    MkErr_t              err;   /* カーネルエラー内容 */
     MvfsMsgVfsReadResp_t *pMsg; /* 応答メッセージ     */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
 
     /* バッファ確保 */
     pMsg = malloc( sizeof ( MvfsMsgVfsReadResp_t ) + size );
@@ -600,24 +600,24 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
     }
 
     /* メッセージ送信 */
-    ret = MkMsgSend(
+    ret = LibMkMsgSend(
               taskId,                                   /* 送信先タスクID   */
               pMsg,                                     /* 送信メッセージ   */
               sizeof ( MvfsMsgVfsReadResp_t ) + size,   /* 送信メッセージ長 */
-              &errNo                                  );/* エラー番号       */
+              &err                                    );/* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */

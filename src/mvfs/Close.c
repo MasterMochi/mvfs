@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Close.c                                                           */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -18,7 +18,7 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmlog.h>
 #include <MLib/MLibState.h>
 
@@ -344,13 +344,13 @@ void CloseRcvMsgCloseReq( MkTaskId_t taskId,
 static void SendMsgCloseResp( MkTaskId_t dst,
                               uint32_t   result )
 {
-    int32_t            ret;     /* 関数戻り値 */
-    uint32_t           errNo;   /* エラー番号 */
+    MkRet_t            ret;     /* 関数戻り値 */
+    MkErr_t            err;     /* エラー内容 */
     MvfsMsgCloseResp_t msg;     /* メッセージ */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( msg ) );
 
     LibMlogPut(
@@ -368,19 +368,19 @@ static void SendMsgCloseResp( MkTaskId_t dst,
     msg.result        = result;
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( msg ), &errNo );
+    ret = LibMkMsgSend( dst, &msg, sizeof ( msg ), &err );
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
+            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
             __FILE__,
             __LINE__,
             __func__,
             ret,
-            errNo
+            err
         );
     }
 
@@ -400,13 +400,13 @@ static void SendMsgCloseResp( MkTaskId_t dst,
 static void SendMsgVfsCloseReq( MkTaskId_t dst,
                                 uint32_t   globalFd )
 {
-    int32_t              ret;   /* 関数戻り値 */
-    uint32_t             errNo; /* エラー番号 */
+    MkRet_t              ret;   /* 関数戻り値 */
+    MkErr_t              err;   /* エラー内容 */
     MvfsMsgVfsCloseReq_t msg;   /* メッセージ */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgVfsCloseReq_t ) );
 
     /* メッセージ設定 */
@@ -424,19 +424,19 @@ static void SendMsgVfsCloseReq( MkTaskId_t dst,
     );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( msg ), &errNo );
+    ret = LibMkMsgSend( dst, &msg, sizeof ( msg ), &err );
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
+            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
             __FILE__,
             __LINE__,
             __func__,
             ret,
-            errNo
+            err
         );
     }
 

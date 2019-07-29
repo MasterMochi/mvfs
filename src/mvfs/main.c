@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -17,7 +17,7 @@
 
 /* ライブラリヘッダ */
 #include <libmlog.h>
-#include <libMk.h>
+#include <libmk.h>
 
 /* モジュール共通ヘッダ */
 #include <mvfs.h>
@@ -73,7 +73,7 @@ static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
 /******************************************************************************/
 void main( void )
 {
-    int32_t ret;    /* カーネル関数戻り値 */
+    MkRet_t ret;    /* カーネル関数戻り値 */
 
     /* 各機能初期化 */
     NodeInit();
@@ -83,15 +83,15 @@ void main( void )
     CloseInit();
 
     /* タスク名登録 */
-    ret = MkTaskNameRegister( "VFS", NULL );
+    ret = LibMkTaskNameRegister( "VFS", NULL );
 
     /* 登録結果判定 */
-    if ( ret != MK_TASKNAME_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         /* TODO: アボート */
         LibMlogPut(
-            "[mvfs][%s:%d] MkTaskNameRegister() error.",
+            "[mvfs][%s:%d] LibMkTaskNameRegister() error.",
             __FILE__,
             __LINE__
         );
@@ -115,13 +115,15 @@ void main( void )
 /******************************************************************************/
 static void Loop( void )
 {
-    int32_t      size;          /* メッセージサイズ   */
-    uint32_t     errNo;         /* エラー番号         */
+    size_t       size;          /* メッセージサイズ   */
+    MkRet_t      ret;           /* 戻り値             */
+    MkErr_t      err;           /* エラー内容         */
     MkTaskId_t   srcTaskId;     /* 送信元タスクID     */
     MvfsMsgHdr_t *pMsgHdr;      /* メッセージバッファ */
 
     /* 初期化 */
-    errNo     = MK_MSG_ERR_NONE;
+    ret       = MK_RET_FAILURE;
+    err       = MK_ERR_NONE;
     srcTaskId = MK_TASKID_MAX;
 
     /* バッファメモリ割当て */
@@ -139,14 +141,15 @@ static void Loop( void )
     /* メインループ */
     while ( true ) {
         /* メッセージ受信 */
-        size = MkMsgReceive( MK_TASKID_NULL,        /* 受信タスクID   */
-                             pMsgHdr,               /* バッファ       */
-                             MK_MSG_SIZE_MAX,       /* バッファサイズ */
-                             &srcTaskId,            /* 送信元タスクID */
-                             &errNo           );    /* エラー番号     */
+        ret = LibMkMsgReceive( MK_TASKID_NULL,      /* 受信タスクID   */
+                               pMsgHdr,             /* バッファ       */
+                               MK_MSG_SIZE_MAX,     /* バッファサイズ */
+                               &srcTaskId,          /* 送信元タスクID */
+                               &size,               /* 受信サイズ     */
+                               &err           );    /* エラー内容     */
 
         /* メッセージ受信結果判定 */
-        if ( size == MK_MSG_RET_FAILURE ) {
+        if ( ret != MK_RET_SUCCESS ) {
             /* 失敗 */
 
             continue;

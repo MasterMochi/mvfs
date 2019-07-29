@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -19,7 +19,7 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmvfs.h>
 #include <MLib/MLib.h>
 
@@ -77,18 +77,20 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
                                 uint32_t           *pErrNo )
 {
     char         *pBuffer;  /* 受信バッファ               */
-    int32_t      size;      /* 受信サイズ                 */
-    uint32_t     errNo;     /* エラー番号                 */
+    size_t       size;      /* 受信サイズ                 */
+    MkRet_t      retLibMk;  /* カーネル戻り値             */
+    MkErr_t      err;       /* エラー内容                 */
     MkTaskId_t   src;       /* 送信元タスクID             */
     MkTaskId_t   mvfs;      /* 仮想ファイルサーバタスクID */
     LibMvfsRet_t ret;       /* 戻り値                     */
 
     /* 初期化 */
-    pBuffer = NULL;
-    size    = MK_MSG_RET_FAILURE;
-    errNo   = MK_MSG_ERR_NONE;
-    src     = MK_TASKID_NULL;
-    mvfs    = MK_TASKID_NULL;
+    pBuffer  = NULL;
+    size     = 0;
+    retLibMk = MK_RET_FAILURE;
+    err      = MK_ERR_NONE;
+    src      = MK_TASKID_NULL;
+    mvfs     = MK_TASKID_NULL;
 
     /* エラー番号初期化 */
     MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NONE );
@@ -132,14 +134,15 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
         }
 
         /* メッセージ受信 */
-        size = MkMsgReceive( MK_TASKID_NULL,        /* 受信タスクID   */
-                             pBuffer,               /* バッファ       */
-                             MK_MSG_SIZE_MAX,       /* バッファサイズ */
-                             &src,                  /* 送信元タスクID */
-                             &errNo            );
+        retLibMk = LibMkMsgReceive( MK_TASKID_NULL,        /* 受信タスクID   */
+                                    pBuffer,               /* バッファ       */
+                                    MK_MSG_SIZE_MAX,       /* バッファサイズ */
+                                    &src,                  /* 送信元タスクID */
+                                    &size,                 /* 受信サイズ     */
+                                    &err              );
 
         /* 受信結果判定 */
-        if ( size == MK_MSG_RET_FAILURE ) {
+        if ( retLibMk != MK_RET_SUCCESS ) {
             /* 失敗 */
 
             continue;

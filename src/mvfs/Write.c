@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Write.c                                                           */
-/*                                                                 2019/07/15 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -18,7 +18,7 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmlog.h>
 #include <MLib/MLibState.h>
 
@@ -353,13 +353,13 @@ static void SendMsgWriteResp( MkTaskId_t dst,
                               uint32_t   result,
                               size_t     size      )
 {
-    int32_t            ret;     /* 関数戻り値 */
-    uint32_t           errNo;   /* エラー番号 */
+    MkRet_t            ret;     /* 関数戻り値 */
+    MkErr_t            err;     /* エラー内容 */
     MvfsMsgWriteResp_t msg;     /* メッセージ */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgWriteResp_t ) );
 
     /* メッセージ設定 */
@@ -379,19 +379,19 @@ static void SendMsgWriteResp( MkTaskId_t dst,
     );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &errNo );
+    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &err );
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
+            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
             __FILE__,
             __LINE__,
             __func__,
             ret,
-            errNo
+            err
         );
     }
 
@@ -418,14 +418,14 @@ static void SendMsgVfsWriteReq( MkTaskId_t dst,
                                 size_t     size      )
 {
     uint8_t              buffer[ MK_MSG_SIZE_MAX ]; /* バッファ   */
-    int32_t              ret;                       /* 関数戻り値 */
-    uint32_t             errNo;                     /* エラー番号 */
+    MkRet_t              ret;                       /* 関数戻り値 */
+    MkErr_t              err;                       /* エラー内容 */
     MvfsMsgVfsWriteReq_t *pMsg;                     /* メッセージ */
 
     /* 初期化 */
-    ret   = MK_MSG_RET_FAILURE;
-    errNo = MK_MSG_ERR_NONE;
-    pMsg  = ( MvfsMsgVfsWriteReq_t * ) buffer;
+    ret  = MK_RET_FAILURE;
+    err  = MK_ERR_NONE;
+    pMsg = ( MvfsMsgVfsWriteReq_t * ) buffer;
 
     LibMlogPut(
         "[mvfs][%s:%d] %s() dst=%u, globalFd=%u, writeIdx=0x%X, size=%u",
@@ -467,22 +467,22 @@ static void SendMsgVfsWriteReq( MkTaskId_t dst,
     memcpy( pMsg->pBuffer, pBuffer, size );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( dst,
-                     pMsg,
-                     sizeof ( MvfsMsgVfsWriteReq_t ) + size,
-                     &errNo                                  );
+    ret = LibMkMsgSend( dst,
+                        pMsg,
+                        sizeof ( MvfsMsgVfsWriteReq_t ) + size,
+                        &err                                    );
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, errNo=%#x",
+            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
             __FILE__,
             __LINE__,
             __func__,
             ret,
-            errNo
+            err
         );
     }
 

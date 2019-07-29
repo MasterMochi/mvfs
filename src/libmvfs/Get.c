@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Get.c                                                          */
-/*                                                                 2019/07/07 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -16,7 +16,7 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmvfs.h>
 #include <MLib/MLib.h>
 
@@ -54,13 +54,13 @@
 LibMvfsRet_t LibMvfsGetTaskId( MkTaskId_t *pTaskId,
                                uint32_t   *pErrNo   )
 {
-    int32_t  ret;   /* 関数戻り値           */
-    uint32_t errNo; /* エラー番号           */
-    uint32_t retry; /* リトライカウンタ     */
+    MkRet_t  ret;   /* 関数戻り値       */
+    MkErr_t  err;   /* エラー内容       */
+    uint32_t retry; /* リトライカウンタ */
 
     /* 初期化 */
-    ret   = MK_TASKNAME_RET_FAILURE;
-    errNo = MK_TASKNAME_ERR_NONE;
+    ret   = MK_RET_FAILURE;
+    err   = MK_ERR_NONE;
     retry = 0;
     MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NONE );
 
@@ -79,22 +79,22 @@ LibMvfsRet_t LibMvfsGetTaskId( MkTaskId_t *pTaskId,
     /* リトライ上限まで繰り返す */
     do {
         /* タスクID取得 */
-        ret = MkTaskNameGet( "VFS", pTaskId, &errNo );
+        ret = LibMkTaskNameGet( "VFS", pTaskId, &err );
 
         /* 取得結果判定 */
-        if ( ret == MK_TASKNAME_RET_SUCCESS ) {
+        if ( ret == MK_RET_SUCCESS ) {
             /* 成功 */
 
             break;
         }
 
         /* リトライ判定 */
-        if ( ( errNo == MK_TASKNAME_ERR_NOREGISTERED ) &&
-             ( retry <= RETRY_MAX                    )    ) {
+        if ( ( err   == MK_ERR_NO_REGISTERED ) &&
+             ( retry <= RETRY_MAX            )    ) {
             /* リトライ要 */
 
             /* ビジーウェイト */
-            MkTimerSleep( RETRY_WAIT, NULL );
+            LibMkTimerSleep( RETRY_WAIT, NULL );
             /* リトライ回数更新 */
             retry++;
             /* リトライ */

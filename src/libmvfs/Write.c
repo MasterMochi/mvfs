@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Write.c                                                        */
-/*                                                                 2019/07/11 */
+/*                                                                 2019/07/28 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -15,7 +15,7 @@
 #include <string.h>
 
 /* ライブラリヘッダ */
-#include <libMk.h>
+#include <libmk.h>
 #include <libmvfs.h>
 #include <MLib/MLib.h>
 
@@ -207,32 +207,36 @@ static LibMvfsRet_t ReceiveWriteResp( MkTaskId_t         taskId,
                                       MvfsMsgWriteResp_t *pMsg,
                                       uint32_t           *pErrNo )
 {
-    int32_t  size;  /* 受信メッセージサイズ */
-    uint32_t errNo; /* カーネルエラー番号   */
+    size_t  size;   /* 受信メッセージサイズ */
+    MkRet_t ret;    /* カーネル戻り値       */
+    MkErr_t err;    /* カーネルエラー内容   */
 
     /* 初期化 */
-    size  = 0;
-    errNo = MK_MSG_ERR_NONE;
+    size = 0;
+    ret  = MK_RET_FAILURE;
+    err  = MK_ERR_NONE;
 
     /* メッセージ受信 */
-    size = MkMsgReceive( taskId,                            /* 受信タスクID   */
-                         pMsg,                              /* バッファ       */
-                         sizeof ( MvfsMsgWriteResp_t ),     /* バッファサイズ */
-                         NULL,                              /* 送信元タスクID */
-                         &errNo                        );   /* エラー番号     */
+    ret = LibMkMsgReceive(
+              taskId,                           /* 受信タスクID   */
+              pMsg,                             /* バッファ       */
+              sizeof ( MvfsMsgWriteResp_t ),    /* バッファサイズ */
+              NULL,                             /* 送信元タスクID */
+              &size,                            /* 受信サイズ     */
+              &err                            );/* エラー番号     */
 
     /* 受信結果判定 */
-    if ( size == MK_MSG_RET_FAILURE ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 存在しないタスクID */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
@@ -303,14 +307,14 @@ static LibMvfsRet_t SendWriteReq( MkTaskId_t taskId,
 {
     char              buffer[ MK_MSG_SIZE_MAX ];    /* メッセージバッファ */
     size_t            msgSize;                      /* メッセージサイズ   */
-    int32_t           ret;                          /* カーネル戻り値     */
-    uint32_t          errNo;                        /* カーネルエラー番号 */
+    MkRet_t           ret;                          /* カーネル戻り値     */
+    MkErr_t           err;                          /* カーネルエラー内容 */
     MvfsMsgWriteReq_t *pMsg;                        /* 要求メッセージ     */
 
     /* 初期化 */
     msgSize = sizeof ( MvfsMsgWriteReq_t ) + size;
-    ret     = MK_MSG_RET_FAILURE;
-    errNo   = MK_MSG_ERR_NONE;
+    ret     = MK_RET_FAILURE;
+    err     = MK_ERR_NONE;
     pMsg    = ( MvfsMsgWriteReq_t * ) &buffer;
     memset( buffer, 0, sizeof ( buffer ) );
 
@@ -323,23 +327,23 @@ static LibMvfsRet_t SendWriteReq( MkTaskId_t taskId,
     memcpy( pMsg->pBuffer, pBuffer, size );
 
     /* メッセージ送信 */
-    ret = MkMsgSend( taskId,        /* 送信先タスクID   */
-                     pMsg,          /* 送信メッセージ   */
-                     msgSize,       /* 送信メッセージ長 */
-                     &errNo   );    /* エラー番号       */
+    ret = LibMkMsgSend( taskId,        /* 送信先タスクID   */
+                        pMsg,          /* 送信メッセージ   */
+                        msgSize,       /* 送信メッセージ長 */
+                        &err     );    /* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_MSG_RET_SUCCESS ) {
+    if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* エラー番号判定 */
-        if ( errNo == MK_MSG_ERR_NO_EXIST ) {
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( errNo == MK_MSG_ERR_NO_MEMORY ) {
+        } else if ( err == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
