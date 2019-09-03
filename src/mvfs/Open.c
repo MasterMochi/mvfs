@@ -70,14 +70,14 @@ static MLibState_t Task0202( void *pArg );
 /******************************************************************************/
 /** 状態遷移表 */
 static const MLibStateTransition_t gStt[] = {
-    /*-----------------------+-------------------+---------+--------------------------------*/
-    /* 状態                  | イベント          | タスク  | { 遷移先状態                 } */
-    /*-----------------------+-------------------+---------+--------------------------------*/
-    { STATE_INI              , EVENT_OPEN_REQ    , Task0101, { STATE_VFSOPEN_RESP_WAIT, 0 } },
-    { STATE_INI              , EVENT_VFSOPEN_RESP, NULL    , { STATE_INI              , 0 } },
-    { STATE_VFSOPEN_RESP_WAIT, EVENT_OPEN_REQ    , NULL    , { STATE_VFSOPEN_RESP_WAIT, 0 } },
-    { STATE_VFSOPEN_RESP_WAIT, EVENT_VFSOPEN_RESP, Task0202, { STATE_INI              , 0 } }  };
-    /*-----------------------+-------------------+---------+--------------------------------*/
+    /*-----------------------+-------------------+---------+---------------------------------------------------------*/
+    /* 状態                  | イベント          | タスク  | { 遷移先状態                                          } */
+    /*-----------------------+-------------------+---------+---------------------------------------------------------*/
+    { STATE_INI              , EVENT_OPEN_REQ    , Task0101, { STATE_INI              , STATE_VFSOPEN_RESP_WAIT, 0 } },
+    { STATE_INI              , EVENT_VFSOPEN_RESP, NULL    , { STATE_INI              , 0                          } },
+    { STATE_VFSOPEN_RESP_WAIT, EVENT_OPEN_REQ    , NULL    , { STATE_VFSOPEN_RESP_WAIT, 0                          } },
+    { STATE_VFSOPEN_RESP_WAIT, EVENT_VFSOPEN_RESP, Task0202, { STATE_INI              , 0                          } }  };
+    /*-----------------------+-------------------+---------+---------------------------------------------------------*/
 
 /** 状態遷移ハンドル */
 static MLibStateHandle_t gStateHdl;
