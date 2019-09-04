@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Read.c                                                            */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -19,13 +19,13 @@
 
 /* ライブラリヘッダ */
 #include <libmk.h>
-#include <libmlog.h>
 #include <MLib/MLibState.h>
 
 /* モジュール共通ヘッダ */
 #include <mvfs.h>
 
 /* モジュールヘッダ */
+#include "Debug.h"
 #include "Fd.h"
 
 
@@ -98,6 +98,8 @@ void ReadInit( void )
     uint32_t  errNo;    /* エラー番号 */
     MLibRet_t ret;      /* MLIB戻り値 */
 
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
+
     /* 初期化 */
     errNo = MLIB_STATE_ERR_NONE;
     ret   = MLIB_FAILURE;
@@ -113,16 +115,10 @@ void ReadInit( void )
     if ( ret != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateInit() error. ret=%d, errNo=0x%X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            errNo
-        );
+        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, errNo );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -157,10 +153,8 @@ void ReadRcvMsgVfsReadResp( MkTaskId_t taskId,
     pMsg      = ( MvfsMsgVfsReadResp_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, result=%u, size=%u",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. taskId=0x%X, result=%u, size=%u",
         __func__,
         taskId,
         pMsg->result,
@@ -174,13 +168,8 @@ void ReadRcvMsgVfsReadResp( MkTaskId_t taskId,
     if ( pFdInfo == NULL ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): FD error.",
-            __FILE__,
-            __LINE__,
-            __func__
-        );
-
+        DEBUG_LOG_ERR( "FdGet(): %u", pMsg->globalFd );
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
@@ -201,27 +190,13 @@ void ReadRcvMsgVfsReadResp( MkTaskId_t taskId,
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=0x%X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            retMLib,
-            errNo
-        );
-
+        DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, errNo );
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s(): exec. state=%u->%u",
-        __FILE__,
-        __LINE__,
-        __func__,
-        prevState,
-        nextState
-    );
-
+    DEBUG_LOG_TRC( "state: %u->%u", prevState, nextState );
+    DEBUG_LOG_TRC( "%s(): end.", __func__ );
     return;
 }
 
@@ -258,10 +233,8 @@ void ReadRcvMsgReadReq( MkTaskId_t taskId,
     pMsg      = ( MvfsMsgReadReq_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, globalFd=%d, readIdx=0x%X, size=%u",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. taskId=0x%X, globalFd=%u, readIdx=0x%X, size=%u",
         __func__,
         taskId,
         pMsg->globalFd,
@@ -276,16 +249,12 @@ void ReadRcvMsgReadReq( MkTaskId_t taskId,
     if ( pFdInfo == NULL ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): FD error.",
-            __FILE__,
-            __LINE__,
-            __func__
-        );
+        DEBUG_LOG_ERR( "FdGet(): %u", pMsg->globalFd );
 
         /* read応答メッセージ送信 */
         SendMsgReadResp( taskId, MVFS_RESULT_FAILURE, NULL, 0 );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
@@ -306,30 +275,17 @@ void ReadRcvMsgReadReq( MkTaskId_t taskId,
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=0x%X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            retMLib,
-            errNo
-        );
+        DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, errNo );
 
         /* read応答メッセージ送信 */
         SendMsgReadResp( taskId, MVFS_RESULT_FAILURE, NULL, 0 );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s(): exec. state=%u->%u",
-        __FILE__,
-        __LINE__,
-        __func__,
-        prevState,
-        nextState
-    );
-
+    DEBUG_LOG_TRC( "state: %u->%u", prevState, nextState );
+    DEBUG_LOG_TRC( "%s(): end.", __func__ );
     return;
 }
 
@@ -363,10 +319,8 @@ static void SendMsgReadResp( MkTaskId_t dst,
     ret = MK_RET_FAILURE;
     err = MK_ERR_NONE;
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, result=%u, size=%u.",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. dst=0x%X, result=%d, size=%u",
         __func__,
         dst,
         result,
@@ -380,13 +334,8 @@ static void SendMsgReadResp( MkTaskId_t dst,
     if ( pMsg == NULL ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): malloc error.",
-            __FILE__,
-            __LINE__,
-            __func__
-        );
-
+        DEBUG_LOG_ERR( "malloc(): %u", sizeof ( MvfsMsgReadResp_t ) + size );
+        DEBUG_LOG_FNC( "%s(): end.", __func__ );
         return;
     }
 
@@ -414,19 +363,13 @@ static void SendMsgReadResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            err
-        );
+        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
     }
 
     /* バッファ解放 */
     free( pMsg );
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -463,10 +406,8 @@ static void SendMsgVfsReadReq( MkTaskId_t dst,
     msg.readIdx       = readIdx;
     msg.size          = size;
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, globalFd=%u, readIdx=0x%X, size=%u",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. dst=0x%X, globalFd=%u, readIdx=0x%X, size=%u",
         __func__,
         dst,
         globalFd,
@@ -481,16 +422,10 @@ static void SendMsgVfsReadReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            err
-        );
+        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -513,6 +448,8 @@ static MLibState_t Task0101( void *pArg )
     StateTaskParam_t *pParam;   /* 状態遷移パラメータ */
     MvfsMsgReadReq_t *pMsg;     /* read要求メッセージ */
 
+    DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
+
     /* 初期化 */
     pParam = ( StateTaskParam_t  * ) pArg;
     pNode  = pParam->pFdInfo->pNode;
@@ -527,6 +464,7 @@ static MLibState_t Task0101( void *pArg )
     /* [TODO]read要求元タスクID保存 */
     gReadTaskId = pParam->taskId;
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_VFSREAD_RESP_WAIT );
     return STATE_VFSREAD_RESP_WAIT;
 }
 
@@ -547,6 +485,8 @@ static MLibState_t Task0202( void *pArg )
     StateTaskParam_t     *pParam;  /* 状態遷移パラメータ    */
     MvfsMsgVfsReadResp_t *pMsg;    /* vfsRead応答メッセージ */
 
+    DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
+
     /* 初期化 */
     pParam = ( StateTaskParam_t     * ) pArg;
     pMsg   = ( MvfsMsgVfsReadResp_t * ) pParam->pBuffer;
@@ -554,6 +494,7 @@ static MLibState_t Task0202( void *pArg )
     /* read応答メッセージ送信 */
     SendMsgReadResp( gReadTaskId, pMsg->result, pMsg->pBuffer, pMsg->size );
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
     return STATE_INI;
 }
 

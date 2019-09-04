@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Open.c                                                            */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -17,13 +17,13 @@
 
 /* ライブラリヘッダ */
 #include <libmk.h>
-#include <libmlog.h>
 #include <MLib/MLibState.h>
 
 /* モジュール共通ヘッダ */
 #include <mvfs.h>
 
 /* モジュールヘッダ */
+#include "Debug.h"
 #include "Fd.h"
 #include "Open.h"
 #include "Node.h"
@@ -101,6 +101,8 @@ void OpenInit( void )
     uint32_t  errNo;    /* エラー番号 */
     MLibRet_t ret;      /* MLIB戻り値 */
 
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
+
     /* 初期化 */
     errNo = MLIB_STATE_ERR_NONE;
     ret   = MLIB_FAILURE;
@@ -116,16 +118,10 @@ void OpenInit( void )
     if ( ret != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateInit() error. ret=%d, errNo=%#X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            errNo
-        );
+        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, errNo );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -156,12 +152,11 @@ void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
     nextState = MLIB_STATE_NULL;
     memset( &param, 0, sizeof ( param ) );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. taskId=%d, pBuffer=%p",
         __func__,
-        taskId
+        taskId,
+        pBuffer
     );
 
     /* 状態遷移パラメータ設定 */
@@ -180,27 +175,12 @@ void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=%#X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            retMLib,
-            errNo
-        );
-
+        DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, errNo );
         return;
     }
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s(): exec. state=%u->%u",
-        __FILE__,
-        __LINE__,
-        __func__,
-        prevState,
-        nextState
-    );
-
+    DEBUG_LOG_TRC( "%s(): exec. state=%u->%u", __func__, prevState, nextState );
+    DEBUG_LOG_TRC( "%s(): end.", __func__ );
     return;
 }
 
@@ -235,10 +215,8 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
     pMsg      = ( MvfsMsgOpenReq_t * ) pBuffer;
     memset( &param, 0, sizeof ( param ) );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, localFd=%d, path=%s.",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. taskId=0x%X, localFd=%d, path=%s",
         __func__,
         taskId,
         pMsg->localFd,
@@ -249,18 +227,12 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
     if ( pMsg->path[ 0 ] != '/' ) {
         /* 絶対パスでない */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. taskId=%u, path=%s.",
-            __FILE__,
-            __LINE__,
-            __func__,
-            taskId,
-            pMsg->path
-        );
+        DEBUG_LOG_ERR( "invalid path: %s", pMsg->path );
 
         /* open応答メッセージ送信 */
         SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
@@ -280,30 +252,18 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): MLibStateExec() error. ret=%d, errNo=%#X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            retMLib,
-            errNo
-        );
+        DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, errNo );
 
         /* open応答メッセージ送信 */
         SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s(): exec. state=%u->%u",
-        __FILE__,
-        __LINE__,
-        __func__,
-        prevState,
-        nextState
-    );
+    DEBUG_LOG_TRC( "state: %u->%u", prevState, nextState );
 
+    DEBUG_LOG_TRC( "%s(): end.", __func__ );
     return;
 }
 
@@ -342,10 +302,8 @@ static void SendMsgOpenResp( MkTaskId_t dst,
     msg.result        = result;
     msg.globalFd      = globalFd;
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, result=%u, globalFd=%u.",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): dst=0x%X, result=%d, globalFd=%u",
         __func__,
         dst,
         result,
@@ -359,16 +317,10 @@ static void SendMsgOpenResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            err
-        );
+        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -405,10 +357,8 @@ static void SendMsgVfsOpenReq( MkTaskId_t dst,
     msg.globalFd      = globalFd;
     strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, pid=%u, globalFd=%u, pPath=%s",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. dst=0x%X, pid=%u, globalFd=%u, pPath=%s",
         __func__,
         dst,
         pid,
@@ -423,16 +373,10 @@ static void SendMsgVfsOpenReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. ret=%d, err=%#x",
-            __FILE__,
-            __LINE__,
-            __func__,
-            ret,
-            err
-        );
+        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -457,6 +401,8 @@ static MLibState_t Task0101( void *pArg )
     StateTaskParam_t *pParam;   /* 状態遷移パラメータ */
     MvfsMsgOpenReq_t *pMsg;     /* open要求メッセージ */
 
+    DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
+
     /* 初期化 */
     pNode  = NULL;
     pParam = ( StateTaskParam_t * ) pArg;
@@ -469,17 +415,12 @@ static MLibState_t Task0101( void *pArg )
     if ( pNode == NULL ) {
         /* ノード無し */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): not exist. path=%s",
-            __FILE__,
-            __LINE__,
-            __func__,
-            pMsg->path
-        );
+        DEBUG_LOG_ERR( "not exist: path=%s", pMsg->path );
 
         /* open応答メッセージ送信 */
         SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
+        DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
         return STATE_INI;
     }
 
@@ -487,11 +428,8 @@ static MLibState_t Task0101( void *pArg )
     if ( pNode->type != NODE_TYPE_MOUNT_FILE ) {
         /* マウントファイルでない */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s(): not mount file. path=%s, type=%u",
-            __FILE__,
-            __LINE__,
-            __func__,
+        DEBUG_LOG_ERR(
+            "not mount file: path=%s, type=%u",
             pMsg->path,
             pNode->type
         );
@@ -499,6 +437,7 @@ static MLibState_t Task0101( void *pArg )
         /* open応答メッセージ送信 */
         SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
+        DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
         return STATE_INI;
     }
 
@@ -517,6 +456,7 @@ static MLibState_t Task0101( void *pArg )
     gOpenTaskId = pParam->taskId;
     gGlobalFd   = globalFd;
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_VFSOPEN_RESP_WAIT );
     return STATE_VFSOPEN_RESP_WAIT;
 }
 
@@ -535,9 +475,12 @@ static MLibState_t Task0101( void *pArg )
 /******************************************************************************/
 static MLibState_t Task0202( void *pArg )
 {
+    DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
+
     /* open応答メッセージ送信 */
     SendMsgOpenResp( gOpenTaskId, MVFS_RESULT_SUCCESS, gGlobalFd );
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
     return STATE_INI;
 }
 

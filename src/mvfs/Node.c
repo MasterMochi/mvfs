@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Node.c                                                            */
-/*                                                                 2019/06/16 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -16,7 +16,6 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libmlog.h>
 #include <MLib/MLibList.h>
 #include <MLib/MLibSplit.h>
 
@@ -24,6 +23,7 @@
 #include <mvfs.h>
 
 /* モジュールヘッダ */
+#include "Debug.h"
 #include "Node.h"
 
 
@@ -73,6 +73,13 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
     uint32_t   idx;     /* インデックス   */
     NodeList_t *pList;  /* エントリリスト */
 
+    DEBUG_LOG_FNC(
+        "%s(): start. pNode=%p, pAddEntry=%p",
+        __func__,
+        pNode,
+        pAddEntry
+    );
+
     /* 先頭エントリリスト取得 */
     pList = ( NodeList_t * )
             MLibListGetNextNode( &( pNode->entryList ), NULL );
@@ -95,6 +102,8 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
 
                 /* エントリ設定 */
                 pList->pEntry[ idx ] = pAddEntry;
+
+                DEBUG_LOG_FNC( "%s(): end. ret=%d", __func__, MVFS_OK );
                 return MVFS_OK;
             }
         }
@@ -113,6 +122,7 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
         }
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%d", __func__, MVFS_NG );
     return MVFS_NG;
 }
 
@@ -141,13 +151,23 @@ NodeInfo_t *NodeCreate( const char *pName,
 {
     NodeInfo_t *pNode;  /* ノード */
 
+    DEBUG_LOG_FNC(
+        "%s(): start. pName=%s, pPath=%s, type=%u, mountTaskId=0x%X",
+        __func__,
+        pName,
+        pPath,
+        type,
+        mountTaskId
+    );
+
     /* ノード割当 */
     pNode = ( NodeInfo_t * ) malloc( sizeof ( NodeInfo_t ) );
 
     /* 割当結果判定 */
     if ( pNode == NULL ) {
         /* 失敗 */
-
+        DEBUG_LOG_ERR( "malloc(): %d", sizeof ( NodeInfo_t ) );
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -169,6 +189,7 @@ NodeInfo_t *NodeCreate( const char *pName,
     /* エントリリスト初期化 */
     MLibListInit( &( pNode->entryList ) );
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pNode );
     return pNode;
 }
 
@@ -185,6 +206,8 @@ void NodeDelete( NodeInfo_t *pNode )
 {
     NodeList_t *pList;      /* エントリリスト   */
     NodeList_t *pNextList;  /* 次エントリリスト */
+
+    DEBUG_LOG_FNC( "%s(): start. pNode=%p", __func__, pNode );
 
     /* エントリリスト取得 */
     pList = ( NodeList_t * ) MLibListGetNextNode( &( pNode->entryList ), NULL );
@@ -206,6 +229,7 @@ void NodeDelete( NodeInfo_t *pNode )
     /* ノード情報解放 */
     free( pNode );
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -232,6 +256,8 @@ NodeInfo_t *NodeGet( const char *pPath )
     NodeInfo_t        *pNode;       /* ノード    　       */
     MLibSplitHandle_t *pHandle;     /* 文字列分割ハンドル */
 
+    DEBUG_LOG_FNC( "%s(): start. pPath=%s", __func__, pPath );
+
     /* 初期化 */
     pName   = NULL;
     num     = 0;
@@ -244,8 +270,8 @@ NodeInfo_t *NodeGet( const char *pPath )
     /* 絶対パス判定 */
     if ( pPath[ 0 ] != '/' ) {
         /* 絶対パスでない */
-
-        /* 該当ノード無し */
+        DEBUG_LOG_ERR( "invalid path: %s", pPath );
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -263,15 +289,13 @@ NodeInfo_t *NodeGet( const char *pPath )
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. pPath=%s, errNo=%#X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            pPath,
-            errNo
+        DEBUG_LOG_ERR(
+            "MLibSplitInitByDelimiter(): ret=%d, err=0x%X, pPath=%s",
+            retMLib,
+            errNo,
+            pPath
         );
-
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -293,15 +317,10 @@ NodeInfo_t *NodeGet( const char *pPath )
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. errNo=%#X",
-            __FILE__,
-            __LINE__,
-            __func__,
-            errNo
-        );
+        DEBUG_LOG_ERR( "MLibSplitTerm(): ret=%d, err=0x%X", retMLib, errNo ) ;
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pNode );
     return pNode;
 }
 
@@ -355,6 +374,8 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     MLibRet_t  retMLib; /* MLib関数戻り値 */
     NodeList_t *pList;  /* エントリリスト */
 
+    DEBUG_LOG_FNC( "%s(): start. pNode=%p", __func__, pNode );
+
     /* エントリリスト作成 */
     pList = ( NodeList_t * ) malloc( sizeof ( NodeList_t ) );
 
@@ -362,6 +383,8 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     if ( pList == NULL ) {
         /* 失敗 */
 
+        DEBUG_LOG_ERR( "malloc(): %d", sizeof ( NodeList_t ) );
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -376,12 +399,16 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
+        DEBUG_LOG_ERR( "MLibListInsertTail(): ret=%d", retMLib );
+
         /* エントリリスト解放 */
         free( pList );
 
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pList );
     return pList;
 }
 
@@ -423,6 +450,8 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
     uint32_t   i;       /* カウンタ           */
     NodeList_t *pList;  /* ノードリスト       */
 
+    DEBUG_LOG_FNC( "%s(): start. pNode=%p, pName=%s", __func__, pNode, pName );
+
     /* 初期化 */
     pList = NULL;
 
@@ -442,12 +471,19 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
             }
 
             /* ファイル名比較 */
-            retCmp = strncmp( pName, pList->pEntry[ i ]->name, MVFS_NAME_MAXLEN );
+            retCmp = strncmp( pName,
+                              pList->pEntry[ i ]->name,
+                              MVFS_NAME_MAXLEN          );
 
             /* 判定 */
             if ( retCmp == 0 ) {
                 /* 一致 */
 
+                DEBUG_LOG_FNC(
+                    "%s(): end. ret=%p",
+                    __func__,
+                    pList->pEntry[ i ]
+                );
                 return pList->pEntry[ i ];
             }
         }
@@ -458,6 +494,7 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
                                      ( MLibListNode_t * ) pList );
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
     return NULL;
 }
 

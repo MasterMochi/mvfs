@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -16,7 +16,6 @@
 #include <kernel/types.h>
 
 /* ライブラリヘッダ */
-#include <libmlog.h>
 #include <libmk.h>
 
 /* モジュール共通ヘッダ */
@@ -24,6 +23,7 @@
 
 /* モジュールヘッダ */
 #include "Close.h"
+#include "Debug.h"
 #include "Mount.h"
 #include "Node.h"
 #include "Open.h"
@@ -73,7 +73,14 @@ static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
 /******************************************************************************/
 void main( void )
 {
+    MkErr_t err;    /* カーネルエラー     */
     MkRet_t ret;    /* カーネル関数戻り値 */
+
+    DEBUG_LOG_TRC( "start" );
+
+    /* 初期化 */
+    err = MK_ERR_NONE;
+    ret = MK_RET_FAILURE;
 
     /* 各機能初期化 */
     NodeInit();
@@ -83,18 +90,14 @@ void main( void )
     CloseInit();
 
     /* タスク名登録 */
-    ret = LibMkTaskNameRegister( "VFS", NULL );
+    ret = LibMkTaskNameRegister( "VFS", &err );
 
     /* 登録結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        /* TODO: アボート */
-        LibMlogPut(
-            "[mvfs][%s:%d] LibMkTaskNameRegister() error.",
-            __FILE__,
-            __LINE__
-        );
+        DEBUG_LOG_ERR( "LibMkTaskNameRegister(): ret=%d, err=0x%X", ret, err );
+        DEBUG_ABORT();
     }
 
     /* メインループ */
@@ -121,6 +124,8 @@ static void Loop( void )
     MkTaskId_t   srcTaskId;     /* 送信元タスクID     */
     MvfsMsgHdr_t *pMsgHdr;      /* メッセージバッファ */
 
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
+
     /* 初期化 */
     ret       = MK_RET_FAILURE;
     err       = MK_ERR_NONE;
@@ -132,11 +137,11 @@ static void Loop( void )
     /* 割当て結果判定 */
     if ( pMsgHdr == NULL ) {
         /* 失敗 */
-
-        /* TODO: アボート */
+        DEBUG_LOG_ERR( "malloc()" );
+        DEBUG_ABORT();
     }
 
-    LibMlogPut( "[mvfs][%s:%d] mvfs start!", __FILE__, __LINE__ );
+    DEBUG_LOG_TRC( "loop start!" );
 
     /* メインループ */
     while ( true ) {
@@ -151,25 +156,20 @@ static void Loop( void )
         /* メッセージ受信結果判定 */
         if ( ret != MK_RET_SUCCESS ) {
             /* 失敗 */
-
+            DEBUG_LOG_ERR( "LibMkMsgReceive(): ret=%d, err=0x%X", ret, err );
             continue;
         }
 
         /* 機能ID範囲チェック */
         if ( pMsgHdr->funcId > MVFS_FUNCID_MAX ) {
             /* 範囲外 */
-
+            DEBUG_LOG_ERR( "invalid funcId: 0x%X", pMsgHdr->funcId );
             continue;
         }
 
         /* 機能ID呼出し */
         ( gFuncTbl[ pMsgHdr->funcId ] )( srcTaskId, pMsgHdr );
     }
-
-    /* バッファ解放(実行されない) */
-    free( pMsgHdr );
-
-    return;
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fd.c                                                              */
-/*                                                                 2019/07/08 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -19,6 +19,7 @@
 #include <MLib/MLibList.h>
 
 /* モジュール内ヘッダ */
+#include "Debug.h"
 #include "Fd.h"
 
 
@@ -77,6 +78,14 @@ uint32_t FdAlloc( uint32_t   localFd,
     uint32_t  idx;          /* インデックス */
     FdTable_t *pFdTable;    /* FDテーブル   */
 
+    DEBUG_LOG_FNC(
+        "%s(): start. localFd=%u, pid=%u, pNode=%p",
+        __func__,
+        localFd,
+        pid,
+        pNode
+    );
+
     /* 初期化 */
     pFdTable = NULL;
 
@@ -97,6 +106,7 @@ uint32_t FdAlloc( uint32_t   localFd,
             if ( pFdTable == NULL ) {
                 /* 失敗 */
 
+                DEBUG_LOG_ERR( "AddFdTable()" );
                 break;
             }
         }
@@ -115,11 +125,17 @@ uint32_t FdAlloc( uint32_t   localFd,
                 pFdTable->fdInfo[ idx ].pid     = pid;
                 pFdTable->fdInfo[ idx ].pNode   = pNode;
 
+                DEBUG_LOG_FNC(
+                    "%s(): end. ret=%u",
+                    __func__,
+                    pFdTable->fdInfo[ idx ].globalFd
+                );
                 return pFdTable->fdInfo[ idx ].globalFd;
             }
         }
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, MVFS_FD_NULL );
     return MVFS_FD_NULL;
 }
 
@@ -134,12 +150,15 @@ uint32_t FdAlloc( uint32_t   localFd,
 /******************************************************************************/
 void FdFree( FdInfo_t *pFdInfo )
 {
+    DEBUG_LOG_FNC( "%s(): start. pFdInfo=%p", __func__, pFdInfo );
+
     /* FD情報初期化 */
-    pFdInfo->used = false;
+    pFdInfo->used    = false;
     pFdInfo->localFd = MVFS_FD_NULL;
     pFdInfo->pid     = MK_PID_NULL;
     pFdInfo->pNode   = NULL;
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -160,6 +179,8 @@ FdInfo_t *FdGet( uint32_t globalFd )
 {
     uint32_t  idx;          /* インデックス */
     FdTable_t *pFdTable;    /* FDテーブル   */
+
+    DEBUG_LOG_FNC( "%s(): start. globalFd=%u", __func__, globalFd );
 
     /* 初期化 */
     pFdTable = NULL;
@@ -186,11 +207,17 @@ FdInfo_t *FdGet( uint32_t globalFd )
             if ( pFdTable->fdInfo[ idx ].globalFd == globalFd ) {
                 /* 該当 */
 
+                DEBUG_LOG_FNC(
+                    "%s(): end. ret=%p",
+                    __func__,
+                    &( pFdTable->fdInfo[ idx ] )
+                );
                 return &( pFdTable->fdInfo[ idx ] );
             }
         }
     }
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
     return NULL;
 }
 
@@ -230,6 +257,8 @@ static FdTable_t *AddFdTable( void )
     FdTable_t *pLast;   /* 最後尾FDテーブル */
     FdTable_t *pAdd;    /* 追加FDテーブル   */
 
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
+
     /* 初期化 */
     globalFd = 0;
     idx      = 0;
@@ -259,6 +288,8 @@ static FdTable_t *AddFdTable( void )
     if ( pAdd == NULL ) {
         /* 失敗 */
 
+        DEBUG_LOG_ERR( "malloc(): %d", sizeof ( FdTable_t ) );
+        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -274,6 +305,7 @@ static FdTable_t *AddFdTable( void )
     /* リスト最後尾挿入 */
     MLibListInsertTail( &gFdTableList, ( MLibListNode_t * ) pAdd );
 
+    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pAdd );
     return pAdd;
 }
 

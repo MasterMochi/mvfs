@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Mount.c                                                           */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/03 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -17,7 +17,6 @@
 
 /* ライブラリヘッダ */
 #include <libmk.h>
-#include <libmlog.h>
 #include <MLib/MLib.h>
 #include <MLib/MLibList.h>
 
@@ -25,6 +24,7 @@
 #include <mvfs.h>
 
 /* モジュールヘッダ */
+#include "Debug.h"
 #include "Mount.h"
 #include "Node.h"
 
@@ -73,10 +73,8 @@ void MountRcvMsgMountReq( MkTaskId_t taskId,
     /* 初期化 */
     pMsg = ( MvfsMsgMountReq_t * ) pBuffer;
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() start. taskId=%d, path=%s.",
-        __FILE__,
-        __LINE__,
+    DEBUG_LOG_TRC(
+        "%s(): start. taskId=0x%X, path=%s",
         __func__,
         taskId,
         pMsg->path
@@ -86,19 +84,12 @@ void MountRcvMsgMountReq( MkTaskId_t taskId,
     if ( pMsg->path[ 0 ] != '/' ) {
         /* 絶対パスでない */
 
-        /* エラー応答 */
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. taskId=%u, path=%s.",
-            __FILE__,
-            __LINE__,
-            __func__,
-            taskId,
-            pMsg->path
-        );
+        DEBUG_LOG_ERR( "invalid path: %s", pMsg->path );
 
         /* mount応答メッセージ(失敗)送信 */
         SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
@@ -115,19 +106,12 @@ void MountRcvMsgMountReq( MkTaskId_t taskId,
     if ( pNode == NULL ) {
         /* 失敗 */
 
-        /* エラー応答 */
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. taskId=%u, path=%s.",
-            __FILE__,
-            __LINE__,
-            __func__,
-            taskId,
-            pMsg->path
-        );
+        DEBUG_LOG_ERR( "NodeCreate() ");
 
         /* mount応答メッセージ(失敗)送信 */
         SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
@@ -141,15 +125,7 @@ void MountRcvMsgMountReq( MkTaskId_t taskId,
     if ( ret != MVFS_OK ) {
         /* 失敗 */
 
-        /* エラー応答 */
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. taskId=%u, path=%s.",
-            __FILE__,
-            __LINE__,
-            __func__,
-            taskId,
-            pMsg->path
-        );
+        DEBUG_LOG_ERR( "NodeAddEntry(): ret=%d", ret );
 
         /* mount応答メッセージ(失敗)送信 */
         SendMsgMountResp( taskId, MVFS_RESULT_FAILURE );
@@ -157,20 +133,14 @@ void MountRcvMsgMountReq( MkTaskId_t taskId,
         /* ノード解放 */
         NodeDelete( pNode );
 
+        DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
     }
 
     /* mount応答メッセージ(成功)送信 */
     SendMsgMountResp( taskId, MVFS_RESULT_SUCCESS );
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() end. taskId=%u, path=%s.",
-        __FILE__,
-        __LINE__,
-        __func__,
-        taskId,
-        pMsg->path
-    );
+    DEBUG_LOG_TRC( "%s(): end.", __func__ );
 
     return;
 }
@@ -208,14 +178,7 @@ static void SendMsgMountResp( MkTaskId_t dst,
     msg.header.type   = MVFS_TYPE_RESP;
     msg.result        = result;
 
-    LibMlogPut(
-        "[mvfs][%s:%d] %s() dst=%u, result=%u.",
-        __FILE__,
-        __LINE__,
-        __func__,
-        dst,
-        result
-    );
+    DEBUG_LOG_TRC( "%s(): start. dst=0x%X, result=%d", __func__, dst, result );
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgMountResp_t ), &err );
@@ -224,16 +187,10 @@ static void SendMsgMountResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        LibMlogPut(
-            "[mvfs][%s:%d] %s() error. dst=%u, err=%u.",
-            __FILE__,
-            __LINE__,
-            __func__,
-            dst,
-            err
-        );
+        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
     }
 
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 

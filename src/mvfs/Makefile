@@ -1,7 +1,7 @@
 #******************************************************************************#
 #*                                                                            *#
 #* src/Makefile                                                               *#
-#*                                                                 2019/07/28 *#
+#*                                                                 2019/09/03 *#
 #* Copyright (C) 2018-2019 Mochi.                                             *#
 #*                                                                            *#
 #******************************************************************************#
@@ -35,6 +35,7 @@ CFLAGS += -m32
 CFLAGS += -fno-pic
 CFLAGS += -static
 CFLAGS += -masm=intel
+CFLAGS += -DDEBUG_LOG_LV=2
 CFLAGS += -I../include
 CFLAGS += -I$(BUILD_DIR)/include
 ifdef BASE_CFLAGS
