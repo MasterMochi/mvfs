@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Send.c                                                         */
-/*                                                                 2019/09/16 */
+/*                                                                 2019/09/17 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -43,6 +43,7 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
 static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      uint32_t   globalFd,
                                      uint32_t   result,
+                                     uint32_t   ready,
                                      void       *pBuffer,
                                      size_t     size,
                                      uint32_t   *pErrNo   );
@@ -55,6 +56,7 @@ static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
 static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
                                       uint32_t   globalFd,
                                       uint32_t   result,
+                                      uint32_t   ready,
                                       size_t     size,
                                       uint32_t   *pErrNo   );
 
@@ -185,6 +187,9 @@ LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
  * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   ready    読込レディ状態
+ *                  - 0               非レディ
+ *                  - MVFS_READY_READ レディ
  * @param[in]   *pBuffer 読込みバッファ
  * @param[in]   size     読込み実施サイズ
  * @param[out]  *pErrNo  エラー番号
@@ -199,6 +204,7 @@ LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
 /******************************************************************************/
 LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
                                      uint32_t result,
+                                     uint32_t ready,
                                      void     *pBuffer,
                                      size_t   size,
                                      uint32_t *pErrNo   )
@@ -212,7 +218,9 @@ LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
 
     /* パラメータチェック */
     if ( ( result != MVFS_RESULT_SUCCESS ) &&
-         ( result != MVFS_RESULT_FAILURE )    ) {
+         ( result != MVFS_RESULT_FAILURE ) &&
+         ( ready  != 0                   ) &&
+         ( ready  != MVFS_READY_READ     )    ) {
         /* 不正 */
 
         /* エラー番号設定 */
@@ -232,7 +240,13 @@ LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
     }
 
     /* vfsRead応答メッセージ送信 */
-    ret = SendVfsReadResp( taskId, globalFd, result, pBuffer, size, pErrNo );
+    ret = SendVfsReadResp( taskId,
+                           globalFd,
+                           result,
+                           ready,
+                           pBuffer,
+                           size,
+                           pErrNo    );
 
     return ret;
 }
@@ -293,6 +307,9 @@ LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
  * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   ready    書込レディ状態
+ *                  - 0                非レディ
+ *                  - MVFS_READY_WRITE レディ
  * @param[in]   size     書込み実施サイズ
  * @param[out]  *pErrNo  エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
@@ -306,6 +323,7 @@ LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
 /******************************************************************************/
 LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
                                       uint32_t result,
+                                      uint32_t ready,
                                       size_t   size,
                                       uint32_t *pErrNo )
 {
@@ -318,7 +336,9 @@ LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
 
     /* パラメータチェック */
     if ( ( result != MVFS_RESULT_SUCCESS ) &&
-         ( result != MVFS_RESULT_FAILURE )    ) {
+         ( result != MVFS_RESULT_FAILURE ) &&
+         ( ready  != 0                   ) &&
+         ( ready  != MVFS_READY_WRITE    )    ) {
         /* 不正 */
 
         /* エラー番号設定 */
@@ -338,7 +358,7 @@ LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
     }
 
     /* vfsWrite応答メッセージ送信 */
-    ret = SendVfsWriteResp( taskId, globalFd, result, size, pErrNo );
+    ret = SendVfsWriteResp( taskId, globalFd, result, ready, size, pErrNo );
 
     return ret;
 }
@@ -510,6 +530,9 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
  * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   ready    読込レディ状態
+ *                  - 0               非レディ
+ *                  - MVFS_READY_READ レディ
  * @param[in]   *pBuffer 読込みバッファ
  * @param[in]   size     読込み実施サイズ
  * @param[in]   *pErrNo  エラー番号
@@ -526,6 +549,7 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
 static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      uint32_t   globalFd,
                                      uint32_t   result,
+                                     uint32_t   ready,
                                      void       *pBuffer,
                                      size_t     size,
                                      uint32_t   *pErrNo   )
@@ -559,6 +583,7 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
     pMsg->header.type   = MVFS_TYPE_RESP;
     pMsg->globalFd      = globalFd;
     pMsg->result        = result;
+    pMsg->ready         = ready;
     pMsg->size          = size;
 
     /* 読込みバッファ有効チェック */
@@ -701,6 +726,9 @@ static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
  * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   ready    書込レディ状態
+ *                  - 0                非レディ
+ *                  - MVFS_READY_WRITE レディ
  * @param[in]   size     書込み実施サイズ
  * @param[in]   *pErrNo  エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
@@ -716,6 +744,7 @@ static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
 static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
                                       uint32_t   globalFd,
                                       uint32_t   result,
+                                      uint32_t   ready,
                                       size_t     size,
                                       uint32_t   *pErrNo   )
 {
@@ -733,6 +762,7 @@ static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
     msg.header.type   = MVFS_TYPE_RESP;
     msg.globalFd      = globalFd;
     msg.result        = result;
+    msg.ready         = ready;
     msg.size          = size;
 
     /* メッセージ送信 */

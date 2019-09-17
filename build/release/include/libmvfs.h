@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2019/09/16 */
+/*                                                                 2019/09/17 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -157,6 +157,7 @@ extern LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
 /* VfsRead応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
                                             uint32_t result,
+                                            uint32_t ready,
                                             void     *pBuffer,
                                             size_t   size,
                                             uint32_t *pErrNo   );
@@ -167,6 +168,7 @@ extern LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
 /* VfsWrite応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
                                              uint32_t result,
+                                             uint32_t ready,
                                              size_t   size,
                                              uint32_t *pErrNo );
 /* Write */

@@ -338,7 +338,11 @@ static void ProcVfsWriteReq( LibMvfsSchedInfo_t   *pInfo,
         /* 設定無し */
 
         /* vfsWrite応答送信 */
-        LibMvfsSendVfsWriteResp( pMsg->globalFd, MVFS_RESULT_FAILURE, 0, NULL );
+        LibMvfsSendVfsWriteResp( pMsg->globalFd,
+                                 MVFS_RESULT_FAILURE,
+                                 0,
+                                 0,
+                                 NULL                 );
     }
 
     return;
@@ -373,6 +377,7 @@ static void ProcVfsReadReq( LibMvfsSchedInfo_t  *pInfo,
         /* vfsRead応答送信 */
         LibMvfsSendVfsReadResp( pMsg->globalFd,
                                 MVFS_RESULT_FAILURE,
+                                0,
                                 NULL,
                                 0,
                                 NULL                 );
