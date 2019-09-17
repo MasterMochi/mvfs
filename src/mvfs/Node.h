@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Node.h                                                            */
-/*                                                                 2019/06/24 */
+/*                                                                 2019/09/16 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -38,6 +38,7 @@ typedef struct {
     char       name[ MVFS_NAME_MAXLEN + 1 ];    /**< 名前             */
     char       path[ MVFS_PATH_MAXLEN + 1 ];    /**< パス             */
     uint32_t   type;                            /**< タイプ           */
+    uint32_t   ready;                           /**< ready状態        */
     MLibList_t entryList;                       /**< エントリリスト   */
     MkTaskId_t mountTaskId;                     /**< マウントタスクID */
 } NodeInfo_t;

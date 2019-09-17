@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Send.c                                                         */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/16 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -39,12 +39,6 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
 static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
                                      uint32_t   result,
                                      uint32_t   *pErrNo );
-/* vfsWrite応答送信 */
-static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
-                                      uint32_t   globalFd,
-                                      uint32_t   result,
-                                      size_t     size,
-                                      uint32_t   *pErrNo   );
 /* vfsRead応答送信 */
 static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      uint32_t   globalFd,
@@ -52,6 +46,17 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      void       *pBuffer,
                                      size_t     size,
                                      uint32_t   *pErrNo   );
+/* vfsReady通知送信 */
+static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
+                                     uint32_t   globalFd,
+                                     uint32_t   ready,
+                                     uint32_t   *pErrNo   );
+/* vfsWrite応答送信 */
+static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
+                                      uint32_t   globalFd,
+                                      uint32_t   result,
+                                      size_t     size,
+                                      uint32_t   *pErrNo   );
 
 
 /******************************************************************************/
@@ -173,66 +178,6 @@ LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
 
 /******************************************************************************/
 /**
- * @brief       vfsWrite応答送信
- * @details     仮想ファイルサーバにvfsWrite応答メッセージを送信する。
- *
- * @param[in]   globalFd グローバルファイルディスクリプタ
- * @param[in]   result   処理結果
- *                  - MVFS_RESULT_SUCCESS 処理成功
- *                  - MVFS_RESULT_FAILURE 処理失敗
- * @param[in]   size     書込み実施サイズ
- * @param[out]  *pErrNo  エラー番号
- *                  - LIBMVFS_ERR_NONE      エラー無し
- *                  - LIBMVFS_ERR_PARAM     パラメータ不正
- *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバが不明
- *
- * @return      送信結果を返す。
- * @retval      LIBMVFS_RET_SUCCESS 正常終了
- * @retval      LIBMVFS_RET_FAILURE 異常終了
- */
-/******************************************************************************/
-LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
-                                      uint32_t result,
-                                      size_t   size,
-                                      uint32_t *pErrNo )
-{
-    int32_t    ret;     /* 関数戻り値 */
-    MkTaskId_t taskId;  /* タスクID   */
-
-    /* 初期化 */
-    ret    = LIBMVFS_RET_FAILURE;
-    taskId = MK_TASKID_NULL;
-
-    /* パラメータチェック */
-    if ( ( result != MVFS_RESULT_SUCCESS ) &&
-         ( result != MVFS_RESULT_FAILURE )    ) {
-        /* 不正 */
-
-        /* エラー番号設定 */
-        MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_PARAM );
-
-        return LIBMVFS_RET_FAILURE;
-    }
-
-    /* タスクID取得 */
-    ret = LibMvfsGetTaskId( &taskId, pErrNo );
-
-    /* 取得結果判定 */
-    if ( ret != LIBMVFS_RET_SUCCESS ) {
-        /* 失敗 */
-
-        return LIBMVFS_RET_FAILURE;
-    }
-
-    /* vfsWrite応答メッセージ送信 */
-    ret = SendVfsWriteResp( taskId, globalFd, result, size, pErrNo );
-
-    return ret;
-}
-
-
-/******************************************************************************/
-/**
  * @brief       vfsRead応答送信
  * @details     仮想ファイルサーバにvfsRead応答メッセージを送信する。
  *
@@ -288,6 +233,112 @@ LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
 
     /* vfsRead応答メッセージ送信 */
     ret = SendVfsReadResp( taskId, globalFd, result, pBuffer, size, pErrNo );
+
+    return ret;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsReady通知送信
+ * @details     仮想ファイルサーバにvfsReady通知メッセージを送信する。
+ *
+ * @param[in]   globalFd グローバルファイスディスクリプタ
+ * @param[in]   ready    読込/書込レディフラグ
+ *                  - MVFS_READY_READ  readレディ
+ *                  - MVFS_READY_WRITE writeレディ
+ * @param[out]  *pErrNo  エラー番号
+ *                  - LIBMVFS_ERR_NONE      エラー無し
+ *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバが不明
+ *
+ * @return      送信結果を返す。
+ * @retval      LIBMVFS_RET_SUCCESS 正常終了
+ * @retval      LIBMVFS_RET_FAILURE 異常終了
+ */
+/******************************************************************************/
+LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
+                                     uint32_t ready,
+                                     uint32_t *pErrNo   )
+{
+    int32_t    ret;     /* 関数戻り値 */
+    MkTaskId_t taskId;  /* タスクID   */
+
+    /* 初期化 */
+    ret    = LIBMVFS_RET_FAILURE;
+    taskId = MK_TASKID_NULL;
+
+    /* タスクID取得 */
+    ret = LibMvfsGetTaskId( &taskId, pErrNo );
+
+    /* タスクID取得 */
+    if ( ret != LIBMVFS_RET_SUCCESS ) {
+        /* 失敗 */
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    /* VfsReady通知メッセージ送信 */
+    ret = SendVfsReadyNtc( taskId, globalFd, ready, pErrNo );
+
+    return ret;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsWrite応答送信
+ * @details     仮想ファイルサーバにvfsWrite応答メッセージを送信する。
+ *
+ * @param[in]   globalFd グローバルファイルディスクリプタ
+ * @param[in]   result   処理結果
+ *                  - MVFS_RESULT_SUCCESS 処理成功
+ *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   size     書込み実施サイズ
+ * @param[out]  *pErrNo  エラー番号
+ *                  - LIBMVFS_ERR_NONE      エラー無し
+ *                  - LIBMVFS_ERR_PARAM     パラメータ不正
+ *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバが不明
+ *
+ * @return      送信結果を返す。
+ * @retval      LIBMVFS_RET_SUCCESS 正常終了
+ * @retval      LIBMVFS_RET_FAILURE 異常終了
+ */
+/******************************************************************************/
+LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
+                                      uint32_t result,
+                                      size_t   size,
+                                      uint32_t *pErrNo )
+{
+    int32_t    ret;     /* 関数戻り値 */
+    MkTaskId_t taskId;  /* タスクID   */
+
+    /* 初期化 */
+    ret    = LIBMVFS_RET_FAILURE;
+    taskId = MK_TASKID_NULL;
+
+    /* パラメータチェック */
+    if ( ( result != MVFS_RESULT_SUCCESS ) &&
+         ( result != MVFS_RESULT_FAILURE )    ) {
+        /* 不正 */
+
+        /* エラー番号設定 */
+        MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_PARAM );
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    /* タスクID取得 */
+    ret = LibMvfsGetTaskId( &taskId, pErrNo );
+
+    /* 取得結果判定 */
+    if ( ret != LIBMVFS_RET_SUCCESS ) {
+        /* 失敗 */
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    /* vfsWrite応答メッセージ送信 */
+    ret = SendVfsWriteResp( taskId, globalFd, result, size, pErrNo );
 
     return ret;
 }
@@ -451,87 +502,6 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
 
 /******************************************************************************/
 /**
- * @brief       vfsWrite応答送信
- * @details     仮想ファイルサーバにvfsWrite応答メッセージを送信する。
- *
- * @param[in]   taskId   仮想ファイルサーバのタスクID
- * @param[in]   globalFd グローバルファイルディスクリプタ
- * @param[in]   result   処理結果
- *                  - MVFS_RESULT_SUCCESS 処理成功
- *                  - MVFS_RESULT_FAILURE 処理失敗
- * @param[in]   size     書込み実施サイズ
- * @param[in]   *pErrNo  エラー番号
- *                  - LIBMVFS_ERR_NONE      エラー無し
- *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
- *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
- *                  - LIBMVFS_ERR_OTHER     その他エラー
- *
- * @return      送信結果を返す。
- * @retval      LIBMVFS_RET_SUCCESS 正常終了
- * @retval      LIBMVFS_RET_FAILURE 異常終了
- */
-/******************************************************************************/
-static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
-                                      uint32_t   globalFd,
-                                      uint32_t   result,
-                                      size_t     size,
-                                      uint32_t   *pErrNo   )
-{
-    MkRet_t               ret;      /* カーネル戻り値     */
-    MkErr_t               err;      /* カーネルエラー内容 */
-    MvfsMsgVfsWriteResp_t msg;      /* 応答メッセージ     */
-
-    /* 初期化 */
-    ret = MK_RET_FAILURE;
-    err = MK_ERR_NONE;
-    memset( &msg, 0, sizeof ( msg ) );
-
-    /* メッセージ作成 */
-    msg.header.funcId = MVFS_FUNCID_VFSWRITE;
-    msg.header.type   = MVFS_TYPE_RESP;
-    msg.globalFd      = globalFd;
-    msg.result        = result;
-    msg.size          = size;
-
-    /* メッセージ送信 */
-    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
-                        &msg,              /* 送信メッセージ   */
-                        sizeof ( msg ),    /* 送信メッセージ長 */
-                        &err            ); /* エラー内容       */
-
-    /* 送信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
-        /* 失敗 */
-
-        /* エラー判定 */
-        if ( err == MK_ERR_NO_EXIST ) {
-            /* 送信先不明 */
-
-            /* エラー番号設定 */
-            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
-
-        } else if ( err == MK_ERR_NO_MEMORY ) {
-            /* メモリ不足 */
-
-            /* エラー番号設定 */
-            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
-
-        } else {
-            /* その他 */
-
-            /* エラー番号設定 */
-            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
-        }
-
-        return LIBMVFS_RET_FAILURE;
-    }
-
-    return LIBMVFS_RET_SUCCESS;
-}
-
-
-/******************************************************************************/
-/**
  * @brief       vfsRead応答送信
  * @details     仮想ファイルサーバにvfsRead応答メッセージを送信する。
  *
@@ -638,6 +608,165 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
 
     /* バッファ解放 */
     free( pMsg );
+
+    return LIBMVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsReady通知送信
+ * @details     仮想ファイルサーバにvfsReady通知メッセージを送信する。
+ *
+ * @param[in]   taskId   仮想ファイルサーバのタスクID
+ * @param[in]   globalFd グローバルファイルディスクリプタ
+ * @param[in]   ready    読込/書込レディフラグ
+ *                  - MVFS_READY_READ  readレディ
+ *                  - MVFS_READY_WRITE writeレディ
+ * @param[in]   *pErrNo  エラー番号
+ *                  - LIBMVFS_ERR_NONE      エラー無し
+ *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
+ *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
+ *                  - LIBMVFS_ERR_OTHER     その他エラー
+ *
+ * @return      送信結果を返す。
+ * @retval      LIBMVFS_RET_SUCCESS 正常終了
+ * @retval      LIBMVFS_RET_FAILURE 異常終了
+ */
+/******************************************************************************/
+static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
+                                     uint32_t   globalFd,
+                                     uint32_t   ready,
+                                     uint32_t   *pErrNo   )
+{
+    MkRet_t              ret;   /* カーネル戻り値     */
+    MkErr_t              err;   /* カーネルエラー内容 */
+    MvfsMsgVfsReadyNtc_t msg;   /* 応答メッセージ     */
+
+    /* 初期化 */
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
+    memset( &msg, 0, sizeof ( msg ) );
+
+    /* メッセージ作成 */
+    msg.header.funcId = MVFS_FUNCID_VFSREADY;
+    msg.header.type   = MVFS_TYPE_NTC;
+    msg.globalFd      = globalFd;
+    msg.ready         = ready;
+
+    /* メッセージ送信 */
+    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
+                        &msg,              /* 送信メッセージ   */
+                        sizeof ( msg ),    /* 送信メッセージ長 */
+                        &err            ); /* エラー内容       */
+
+    /* 送信結果判定 */
+    if ( ret != MK_RET_SUCCESS ) {
+        /* 失敗 */
+
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
+            /* 送信先不明 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
+
+        } else if ( err == MK_ERR_NO_MEMORY ) {
+            /* メモリ不足 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
+
+        } else {
+            /* その他 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
+        }
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    return LIBMVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       vfsWrite応答送信
+ * @details     仮想ファイルサーバにvfsWrite応答メッセージを送信する。
+ *
+ * @param[in]   taskId   仮想ファイルサーバのタスクID
+ * @param[in]   globalFd グローバルファイルディスクリプタ
+ * @param[in]   result   処理結果
+ *                  - MVFS_RESULT_SUCCESS 処理成功
+ *                  - MVFS_RESULT_FAILURE 処理失敗
+ * @param[in]   size     書込み実施サイズ
+ * @param[in]   *pErrNo  エラー番号
+ *                  - LIBMVFS_ERR_NONE      エラー無し
+ *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
+ *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
+ *                  - LIBMVFS_ERR_OTHER     その他エラー
+ *
+ * @return      送信結果を返す。
+ * @retval      LIBMVFS_RET_SUCCESS 正常終了
+ * @retval      LIBMVFS_RET_FAILURE 異常終了
+ */
+/******************************************************************************/
+static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
+                                      uint32_t   globalFd,
+                                      uint32_t   result,
+                                      size_t     size,
+                                      uint32_t   *pErrNo   )
+{
+    MkRet_t               ret;      /* カーネル戻り値     */
+    MkErr_t               err;      /* カーネルエラー内容 */
+    MvfsMsgVfsWriteResp_t msg;      /* 応答メッセージ     */
+
+    /* 初期化 */
+    ret = MK_RET_FAILURE;
+    err = MK_ERR_NONE;
+    memset( &msg, 0, sizeof ( msg ) );
+
+    /* メッセージ作成 */
+    msg.header.funcId = MVFS_FUNCID_VFSWRITE;
+    msg.header.type   = MVFS_TYPE_RESP;
+    msg.globalFd      = globalFd;
+    msg.result        = result;
+    msg.size          = size;
+
+    /* メッセージ送信 */
+    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
+                        &msg,              /* 送信メッセージ   */
+                        sizeof ( msg ),    /* 送信メッセージ長 */
+                        &err            ); /* エラー内容       */
+
+    /* 送信結果判定 */
+    if ( ret != MK_RET_SUCCESS ) {
+        /* 失敗 */
+
+        /* エラー判定 */
+        if ( err == MK_ERR_NO_EXIST ) {
+            /* 送信先不明 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
+
+        } else if ( err == MK_ERR_NO_MEMORY ) {
+            /* メモリ不足 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
+
+        } else {
+            /* その他 */
+
+            /* エラー番号設定 */
+            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
+        }
+
+        return LIBMVFS_RET_FAILURE;
+    }
 
     return LIBMVFS_RET_SUCCESS;
 }

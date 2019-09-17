@@ -492,6 +492,10 @@ static MLibState_t Task0202( void *pArg )
     pParam = ( StateTaskParam_t      * ) pArg;
     pMsg   = ( MvfsMsgVfsWriteResp_t * ) pParam->pBuffer;
 
+    /* ready状態設定 */
+    pParam->pFdInfo->pNode->ready &= ~MVFS_READY_READ;
+    pParam->pFdInfo->pNode->ready |= pMsg->ready;
+
     /* write応答メッセージ送信 */
     SendMsgWriteResp( gWriteTaskId, pMsg->result, pMsg->size );
 

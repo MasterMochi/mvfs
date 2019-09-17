@@ -1,7 +1,7 @@
 #******************************************************************************#
 #*                                                                            *#
 #* src/Makefile                                                               *#
-#*                                                                 2019/09/03 *#
+#*                                                                 2019/09/16 *#
 #* Copyright (C) 2018-2019 Mochi.                                             *#
 #*                                                                            *#
 #******************************************************************************#
@@ -20,6 +20,7 @@ SRCS += Fd.c
 SRCS += Write.c
 SRCS += Read.c
 SRCS += Close.c
+SRCS += Select.c
 
 # ビルドディレクトリ
 BUILD_DIR   = ../../build
@@ -35,7 +36,7 @@ CFLAGS += -m32
 CFLAGS += -fno-pic
 CFLAGS += -static
 CFLAGS += -masm=intel
-CFLAGS += -DDEBUG_LOG_LV=2
+CFLAGS += -DDEBUG_LOG_LV=3
 CFLAGS += -I../include
 CFLAGS += -I$(BUILD_DIR)/include
 ifdef BASE_CFLAGS

@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/include/mvfs.h                                                         */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/09/16 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -22,22 +22,25 @@
 /* 定義                                                                       */
 /******************************************************************************/
 /* 機能ID */
-#define MVFS_FUNCID_MOUNT    ( 0 )  /**< mount        */
-#define MVFS_FUNCID_OPEN     ( 1 )  /**< open         */
-#define MVFS_FUNCID_VFSOPEN  ( 2 )  /**< vfsOpen      */
-#define MVFS_FUNCID_WRITE    ( 3 )  /**< write        */
-#define MVFS_FUNCID_VFSWRITE ( 4 )  /**< vfsWrite     */
-#define MVFS_FUNCID_READ     ( 5 )  /**< read         */
-#define MVFS_FUNCID_VFSREAD  ( 6 )  /**< vfsRead      */
-#define MVFS_FUNCID_CLOSE    ( 7 )  /**< close        */
-#define MVFS_FUNCID_VFSCLOSE ( 8 )  /**< vfsClose     */
-#define MVFS_FUNCID_MAX      ( 8 )  /**< 機能ID最大値 */
+#define MVFS_FUNCID_MOUNT    ( 0x00000000 ) /**< Mount        */
+#define MVFS_FUNCID_OPEN     ( 0x00000001 ) /**< Open         */
+#define MVFS_FUNCID_VFSOPEN  ( 0x00000002 ) /**< VfsOpen      */
+#define MVFS_FUNCID_WRITE    ( 0x00000003 ) /**< Write        */
+#define MVFS_FUNCID_VFSWRITE ( 0x00000004 ) /**< VfsWrite     */
+#define MVFS_FUNCID_READ     ( 0x00000005 ) /**< Read         */
+#define MVFS_FUNCID_VFSREAD  ( 0x00000006 ) /**< VfsRead      */
+#define MVFS_FUNCID_CLOSE    ( 0x00000007 ) /**< Close        */
+#define MVFS_FUNCID_VFSCLOSE ( 0x00000008 ) /**< VfsClose     */
+#define MVFS_FUNCID_SELECT   ( 0x00000009 ) /**< Select       */
+#define MVFS_FUNCID_VFSREADY ( 0x0000000A ) /**< VfsReady     */
+#define MVFS_FUNCID_MAX      ( 0x0000000A ) /**< 機能ID最大値 */
 #define MVFS_FUNCID_NUM      \
     ( MVFS_FUNCID_MAX + 1 )         /**< 機能数       */
 
 /* タイプ */
 #define MVFS_TYPE_REQ  ( 0 )    /**< 要求 */
 #define MVFS_TYPE_RESP ( 1 )    /**< 応答 */
+#define MVFS_TYPE_NTC  ( 2 )    /**< 通知 */
 
 /** パス長(NULL文字含まず) */
 #define MVFS_PATH_MAXLEN ( 1023 )
@@ -58,6 +61,10 @@
 
 /** バッファ最大サイズ */
 #define MVFS_BUFFER_SIZE_MAX ( 24064 )
+
+/* レディ状態 */
+#define MVFS_READY_READ  ( 1 )  /**< 読込レディ */
+#define MVFS_READY_WRITE ( 2 )  /**< 書込レディ */
 
 /** メッセージヘッダ */
 typedef struct {
@@ -155,6 +162,7 @@ typedef struct {
     MvfsMsgHdr_t header;        /**< メッセージヘッダ */
     uint32_t     globalFd;      /**< グローバルFD     */
     uint32_t     result;        /**< 処理結果         */
+    uint32_t     ready;         /**< 書込みレディ状態 */
     size_t       size;          /**< 書込み実施サイズ */
 } MvfsMsgVfsWriteResp_t;
 
@@ -195,6 +203,7 @@ typedef struct {
     MvfsMsgHdr_t header;        /**< メッセージヘッダ */
     uint32_t     globalFd;      /**< グローバルFD     */
     uint32_t     result;        /**< 処理結果         */
+    uint32_t     ready;         /**< 読込レディ状態   */
     size_t       size;          /**< 読込み実施サイズ */
     char         pBuffer[];     /**< 読込みバッファ   */
 } MvfsMsgVfsReadResp_t;
@@ -231,6 +240,37 @@ typedef struct {
     uint32_t     globalFd;      /**< グローバルFD     */
     uint32_t     result;        /**< 処理結果         */
 } MvfsMsgVfsCloseResp_t;
+
+
+/*--------*/
+/* Select */
+/*--------*/
+/** Select要求 */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ       */
+    size_t       readFdNum;     /**< 読込監視グローバルFD数 */
+    size_t       writeFdNum;    /**< 書込監視グローバルFD数 */
+    uint32_t     fd[ 0 ];       /**< 監視グローバルFD       */
+} MvfsMsgSelectReq_t;
+
+/** Select応答 */
+typedef struct {
+    MvfsMsgHdr_t header;        /**< メッセージヘッダ         */
+    uint32_t     result;        /**< 処理結果                 */
+    size_t       readFdNum;     /**< 読込レディグローバルFD数 */
+    size_t       writeFdNum;    /**< 書込レディグローバルFD数 */
+    uint32_t     fd[ 0 ];       /**< レディグローバルFD       */
+} MvfsMsgSelectResp_t;
+
+/*----------*/
+/* vfsReady */
+/*----------*/
+/** vfsReady通知メッセージ */
+typedef struct {
+    MvfsMsgHdr_t header;    /**< メッセージヘッダ */
+    uint32_t     globalFd;  /**< グローバルFD     */
+    uint32_t     ready;     /**< Ready対象        */
+} MvfsMsgVfsReadyNtc_t;
 
 
 /******************************************************************************/

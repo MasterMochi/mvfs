@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2019/07/20 */
+/*                                                                 2019/09/16 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -35,6 +35,10 @@
 #define LIBMVFS_ERR_INVALID_FD ( 0x00000006 )   /**< FD無効                   */
 #define LIBMVFS_ERR_OTHER      ( 0x0000FFFF )   /**< その他エラー             */
 
+/* レディフラグ */
+#define MVFS_READY_READ  ( 1 )  /**< Readレディ */
+#define MVFS_READY_WRITE ( 2 )  /**< Writeレディ */
+
 /** 処理結果 */
 typedef uint32_t LibMvfsRet_t;
 
@@ -46,7 +50,13 @@ typedef
       void       *pMsg,         /* 受信メッセージ   */
       size_t     size   );      /* 受信メッセージ長 */
 
-/** vfsOpen要求コールバック関数型 */
+/** VfsClose要求コールバック関数型 */
+typedef
+    void
+    ( *LibMvfsFuncVfsClose_t )
+    ( uint32_t globalFd );  /* グローバルFD */
+
+/** VfsOpen要求コールバック関数型 */
 typedef
     void
     ( *LibMvfsFuncVfsOpen_t )
@@ -54,7 +64,15 @@ typedef
       uint32_t   globalFd,      /* グローバルFD */
       const char *pPath    );   /* ファイルパス */
 
-/** vfsWrite要求コールバック関数型 */
+/** VfsRead要求コールバック関数型 */
+typedef
+    void
+    ( *LibMvfsFuncVfsRead_t )
+    ( uint32_t globalFd,    /* グローバルFD       */
+      uint64_t readIdx,     /* 書込みインデックス */
+      size_t   size      ); /* 書込みサイズ       */
+
+/** VfsWrite要求コールバック関数型 */
 typedef
     void
     ( *LibMvfsFuncVfsWrite_t )
@@ -63,33 +81,41 @@ typedef
       void     *pBuffer,    /* 書込みバッファ     */
       size_t   size      ); /* 書込みサイズ       */
 
-/** vfsRead要求コールバック関数型 */
-typedef
-    void
-    ( *LibMvfsFuncVfsRead_t )
-    ( uint32_t globalFd,    /* グローバルFD       */
-      uint64_t readIdx,     /* 書込みインデックス */
-      size_t   size      ); /* 書込みサイズ       */
-
-/** vfsClose要求コールバック関数型 */
-typedef
-    void
-    ( *LibMvfsFuncVfsClose_t )
-    ( uint32_t globalFd );  /* グローバルFD */
-
 /** スケジューラコールバック関数リスト */
 typedef struct {
-    LibMvfsFuncVfsOpen_t  pVfsOpen;     /**< vfsOpen要求      */
-    LibMvfsFuncVfsWrite_t pVfsWrite;    /**< vfsWrite要求     */
-    LibMvfsFuncVfsRead_t  pVfsRead;     /**< vfsRead要求      */
-    LibMvfsFuncVfsClose_t pVfsClose;    /**< vfsClose要求     */
     LibMvfsFuncOther_t    pOther;       /**< その他メッセージ */
+    LibMvfsFuncVfsClose_t pVfsClose;    /**< VfsClose要求     */
+    LibMvfsFuncVfsOpen_t  pVfsOpen;     /**< VfsOpen要求      */
+    LibMvfsFuncVfsRead_t  pVfsRead;     /**< VfsRead要求      */
+    LibMvfsFuncVfsWrite_t pVfsWrite;    /**< VfsWrite要求     */
 } LibMvfsSchedCallBack_t;
 
 /** スケジューラ情報 */
 typedef struct {
     LibMvfsSchedCallBack_t callBack;
 } LibMvfsSchedInfo_t;
+
+/** Select可能最大FD数 */
+#define LIBMVFS_FD_MAXNUM ( 1024 )
+
+/** FDビットリスト1ブロックサイズ */
+#define LIBMVFS_FDS_BLOCK_SIZE ( 8 * sizeof ( uint32_t ) )
+
+/** FDビットリストチェック */
+#define LIBMVFS_FDS_CHECK( _PFDS, _FD )                                        \
+    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / ( LIBMVFS_FDS_BLOCK_SIZE ) ] &   \
+      ( 1 << ( ( _FD ) % LIBMVFS_FDS_BLOCK_SIZE ) )                          )
+
+/** FDビットリスト設定 */
+#define LIBMVFS_FDS_SET( _PFDS, _FD )                                         \
+    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / ( LIBMVFS_FDS_BLOCK_SIZE ) ] |= \
+      1 << ( ( _FD ) % ( LIBMVFS_FDS_BLOCK_SIZE ) ) )
+
+/** FDビットリストサイズ */
+#define LIBMVFS_FDS_SIZE ( LIBMVFS_FD_MAXNUM / LIBMVFS_FDS_BLOCK_SIZE )
+
+/** FDビットリスト */
+typedef uint32_t LibMvfsFds_t[ LIBMVFS_FDS_SIZE ];
 
 
 /******************************************************************************/
@@ -114,23 +140,31 @@ extern LibMvfsRet_t LibMvfsRead( uint32_t fd,
                                  size_t   bufferSize,
                                  size_t   *pReadSize,
                                  uint32_t *pErrNo     );
+/* Select */
+extern LibMvfsRet_t LibMvfsSelect( LibMvfsFds_t *pReadFds,
+                                   LibMvfsFds_t *pWriteFds,
+                                   uint32_t     *pErr       );
 /* スケジュール開始 */
 extern LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
                                        uint32_t           *pErrNo );
-/* vfsClose応答メッセージ送信 */
+/* VfsClose応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsCloseResp( uint32_t globalFd,
                                              uint32_t result,
                                              uint32_t *pErrNo   );
-/* vfsOpen応答メッセージ送信 */
+/* VfsOpen応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
                                             uint32_t *pErrNo );
-/* vfsRead応答メッセージ送信 */
+/* VfsRead応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
                                             uint32_t result,
                                             void     *pBuffer,
                                             size_t   size,
                                             uint32_t *pErrNo   );
-/* vfsWrite応答メッセージ送信 */
+/* VfsReady通知メッセージ送信 */
+extern LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
+                                            uint32_t ready,
+                                            uint32_t *pErrNo   );
+/* VfsWrite応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
                                              uint32_t result,
                                              size_t   size,

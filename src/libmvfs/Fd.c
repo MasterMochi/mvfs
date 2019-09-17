@@ -137,17 +137,17 @@ void FdFree( FdInfo_t *pFdInfo )
 
 /******************************************************************************/
 /**
- * @brief       FD情報取得
- * @details     FD管理テーブルから指定したFDに該当するFD情報を取得する。
+ * @brief       グローバルFD情報取得
+ * @details     FD管理テーブルからグローバルFDに該当するFD情報を取得する。
  *
- * @param[in]   localFd ローカルファイルディスクリプタ
+ * @param[in]   globalFd グローバルファイルディスクリプタ
  *
  * @return      FD情報へのポインタを返す。
  * @retval      NULL     該当FD情報無し
  * @retval      NULL以外 該当FD情報
  */
 /******************************************************************************/
-FdInfo_t *FdGet( uint32_t localFd )
+FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd )
 {
     uint32_t  idx;          /* インデックス */
     FdTable_t *pFdTable;    /* FDテーブル   */
@@ -174,6 +174,57 @@ FdInfo_t *FdGet( uint32_t localFd )
               idx <= FDTABLE_ENTRY_IDX_MAX;
               idx++                         ) {
             /* グローバルFD比較 */
+            if ( pFdTable->fdInfo[ idx ].globalFd == globalFd ) {
+                /* 該当 */
+
+                return &( pFdTable->fdInfo[ idx ] );
+            }
+        }
+    }
+
+    return NULL;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       FD情報取得
+ * @details     FD管理テーブルからローカルFDに該当するFD情報を取得する。
+ *
+ * @param[in]   localFd ローカルファイルディスクリプタ
+ *
+ * @return      FD情報へのポインタを返す。
+ * @retval      NULL     該当FD情報無し
+ * @retval      NULL以外 該当FD情報
+ */
+/******************************************************************************/
+FdInfo_t *FdGetLocalFdInfo( uint32_t localFd )
+{
+    uint32_t  idx;          /* インデックス */
+    FdTable_t *pFdTable;    /* FDテーブル   */
+
+    /* 初期化 */
+    pFdTable = NULL;
+
+    /* FDテーブルエントリ毎に繰り返し */
+    while ( true ) {
+        /* FDテーブル取得 */
+        pFdTable = ( FdTable_t * )
+                   MLibListGetNextNode( &gFdTableList,
+                                        ( MLibListNode_t * ) pFdTable );
+
+        /* 取得結果判定 */
+        if ( pFdTable == NULL ) {
+            /* FDテーブル無し */
+
+            break;
+        }
+
+        /* FD情報毎に繰り返し */
+        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
+              idx <= FDTABLE_ENTRY_IDX_MAX;
+              idx++                         ) {
+            /* ローカルFD比較 */
             if ( pFdTable->fdInfo[ idx ].localFd == localFd ) {
                 /* 該当 */
 

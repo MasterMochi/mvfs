@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Read.c                                                            */
-/*                                                                 2019/09/03 */
+/*                                                                 2019/09/16 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -490,6 +490,10 @@ static MLibState_t Task0202( void *pArg )
     /* 初期化 */
     pParam = ( StateTaskParam_t     * ) pArg;
     pMsg   = ( MvfsMsgVfsReadResp_t * ) pParam->pBuffer;
+
+    /* ready状態設定 */
+    pParam->pFdInfo->pNode->ready &= ~MVFS_READY_READ;
+    pParam->pFdInfo->pNode->ready |= pMsg->ready;
 
     /* read応答メッセージ送信 */
     SendMsgReadResp( gReadTaskId, pMsg->result, pMsg->pBuffer, pMsg->size );
