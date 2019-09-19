@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/09/16 */
+/*                                                                 2019/09/18 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -18,18 +18,12 @@
 /* ライブラリヘッダ */
 #include <libmk.h>
 
-/* モジュール共通ヘッダ */
+/* 外部モジュールヘッダ */
 #include <mvfs.h>
-
-/* モジュールヘッダ */
-#include "Close.h"
-#include "Debug.h"
-#include "Mount.h"
-#include "Node.h"
-#include "Open.h"
-#include "Read.h"
-#include "Select.h"
-#include "Write.h"
+#include <Debug.h>
+#include <Fd.h>
+#include <Fn.h>
+#include <Node.h>
 
 
 /******************************************************************************/
@@ -52,17 +46,17 @@ static void Loop( void );
 /******************************************************************************/
 /** 機能呼出し関数テーブル */
 static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
-    { MountRcvMsgMountReq,          /* MVFS_FUNCID_MOUNT    */
-      OpenRcvMsgOpenReq,            /* MVFS_FUNCID_OPEN     */
-      OpenRcvMsgVfsOpenResp,        /* MVFS_FUNCID_VFSOPEN  */
-      WriteRcvMsgWriteReq,          /* MVFS_FUNCID_WRITE    */
-      WriteRcvMsgVfsWriteResp,      /* MVFS_FUNCID_VFSWRITE */
-      ReadRcvMsgReadReq,            /* MVFS_FUNCID_READ     */
-      ReadRcvMsgVfsReadResp,        /* MVFS_FUNCID_VFSREAD  */
-      CloseRcvMsgCloseReq,          /* MVFS_FUNCID_CLOSE    */
-      CloseRcvMsgVfsCloseResp,      /* MVFS_FUNCID_VFSCLOSE */
-      SelectRcvMsgSelectReq,        /* MVFS_FUNCID_SELECT   */
-      SelectRcvMsgVfsReadyNtc  };   /* MVFS_FUNCID_VFSREADY */
+    { [ MVFS_FUNCID_MOUNT    ] = FnMountRecvMountReq,
+      [ MVFS_FUNCID_OPEN     ] = FnOpenRecvOpenReq,
+      [ MVFS_FUNCID_VFSOPEN  ] = FnOpenRecvVfsOpenResp,
+      [ MVFS_FUNCID_WRITE    ] = FnWriteRecvWriteReq,
+      [ MVFS_FUNCID_VFSWRITE ] = FnWriteRecvVfsWriteResp,
+      [ MVFS_FUNCID_READ     ] = FnReadRecvReadReq,
+      [ MVFS_FUNCID_VFSREAD  ] = FnReadRecvVfsReadResp,
+      [ MVFS_FUNCID_CLOSE    ] = FnCloseRecvCloseReq,
+      [ MVFS_FUNCID_VFSCLOSE ] = FnCloseRecvVfsCloseResp,
+      [ MVFS_FUNCID_SELECT   ] = FnSelectRecvSelectReq,
+      [ MVFS_FUNCID_VFSREADY ] = FnSelectRecvVfsReadyNtc  };
 
 
 /******************************************************************************/
@@ -86,12 +80,9 @@ void main( void )
     ret = MK_RET_FAILURE;
 
     /* 各機能初期化 */
+    FdInit();
     NodeInit();
-    OpenInit();
-    WriteInit();
-    ReadInit();
-    CloseInit();
-    SelectInit();
+    FnInit();
 
     /* タスク名登録 */
     ret = LibMkTaskNameRegister( "VFS", &err );

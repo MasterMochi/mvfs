@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Select.c                                                          */
-/*                                                                 2019/09/16 */
+/*                                                                 2019/09/18 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -21,12 +21,11 @@
 #include <libmk.h>
 #include <MLib/MLibState.h>
 
-/* モジュール共通ヘッダ */
+/* 外部モジュールヘッダ */
 #include <mvfs.h>
-
-/* モジュール内ヘッダ */
-#include "Debug.h"
-#include "Fd.h"
+#include <Debug.h>
+#include <Fd.h>
+#include <Msg.h>
 
 
 /******************************************************************************/
@@ -50,14 +49,6 @@ typedef struct {
 /******************************************************************************/
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
-/* Select応答メッセージ送信 */
-static void SendMsgSelectResp( MkTaskId_t taskId,
-                               uint32_t   result,
-                               uint32_t   *pReadFdList,
-                               size_t     readFdNum,
-                               uint32_t   *pWriteFdList,
-                               size_t     writeFdNum     );
-
 /* 状態遷移タスク */
 static MLibState_t Task0101( void *pArg );
 static MLibState_t Task0202( void *pArg );
@@ -79,43 +70,8 @@ static MLibStateHandle_t gStateHdl;
 
 
 /******************************************************************************/
-/* グローバル関数定義                                                         */
+/* 外部モジュール向けグローバル関数定義                                       */
 /******************************************************************************/
-/******************************************************************************/
-/**
- * @brief       Select機能初期化
- * @details     状態遷移を初期化する。
- */
-/******************************************************************************/
-void SelectInit( void )
-{
-    uint32_t  err;  /* エラー     */
-    MLibRet_t ret;  /* MLib戻り値 */
-
-    DEBUG_LOG_FNC( "%s(): start.", __func__ );
-
-    /* 初期化 */
-    err = MLIB_STATE_ERR_NONE;
-    ret = MLIB_FAILURE;
-
-    /* 状態遷移初期化 */
-    ret = MLibStateInit( &gStateHdl,
-                         gStt,
-                         sizeof ( gStt ),
-                         STATE_INI,
-                         &err             );
-
-    /* 初期化結果判定 */
-    if ( ret != MLIB_SUCCESS ) {
-        /* 失敗 */
-        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, err );
-    }
-
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
-    return;
-}
-
-
 /******************************************************************************/
 /**
  * @brief       Select要求メッセージ受信
@@ -126,7 +82,7 @@ void SelectInit( void )
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void SelectRcvMsgSelectReq( MkTaskId_t taskId,
+void FnSelectRecvSelectReq( MkTaskId_t taskId,
                             void       *pBuffer )
 {
     uint32_t           err;         /* エラー                   */
@@ -169,7 +125,7 @@ void SelectRcvMsgSelectReq( MkTaskId_t taskId,
         DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, err );
 
         /* Select応答メッセージ送信 */
-        SendMsgSelectResp( taskId, MVFS_RESULT_FAILURE, NULL, 0, NULL, 0 );
+        MsgSendSelectResp( taskId, MVFS_RESULT_FAILURE, NULL, 0, NULL, 0 );
 
         DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
@@ -191,7 +147,7 @@ void SelectRcvMsgSelectReq( MkTaskId_t taskId,
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void SelectRcvMsgVfsReadyNtc( MkTaskId_t taskId,
+void FnSelectRecvVfsReadyNtc( MkTaskId_t taskId,
                               void       *pBuffer )
 {
     uint32_t             err;       /* エラー                   */
@@ -245,96 +201,46 @@ void SelectRcvMsgVfsReadyNtc( MkTaskId_t taskId,
 
 
 /******************************************************************************/
-/* ローカル関数定義                                                           */
+/* 内部モジュール向けグローバル関数定義                                       */
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       Select応答メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にSelect応答メッセージを送信する。
- *
- * @param[in]   dst           メッセージ送信先タスクID
- * @param[in]   result        処理結果
- *                  - MVFS_RESULT_SUCCESS 成功
- *                  - MVFS_RESULT_FAILURE 失敗
- * @param[in]   *pReadFdList  読込レディグローバルFDリスト
- * @param[in]   readFdNum     読込レディグローバルFD数
- * @param[in]   *pWriteFdList 書込レディグローバルFDリスト
- * @param[in]   writeFdNum    書込レディグローバルFD数
+ * @brief       Select機能初期化
+ * @details     状態遷移を初期化する。
  */
 /******************************************************************************/
-static void SendMsgSelectResp( MkTaskId_t dst,
-                               uint32_t   result,
-                               uint32_t   *pReadFdList,
-                               size_t     readFdNum,
-                               uint32_t   *pWriteFdList,
-                               size_t     writeFdNum     )
+void SelectInit( void )
 {
-    size_t              size;   /* メッセージサイズ */
-    MkRet_t             ret;    /* カーネル戻り値   */
-    MkErr_t             err;    /* カーネルエラー   */
-    MvfsMsgSelectResp_t *pMsg;  /* メッセージ       */
+    uint32_t  err;  /* エラー     */
+    MLibRet_t ret;  /* MLib戻り値 */
+
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
 
     /* 初期化 */
-    size = sizeof ( MvfsMsgSelectResp_t ) +
-           sizeof ( uint32_t ) * ( readFdNum + writeFdNum );
-    ret  = MK_RET_FAILURE;
-    err  = MK_ERR_NONE;
+    err = MLIB_STATE_ERR_NONE;
+    ret = MLIB_FAILURE;
 
-    DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, result=%d, readFdNum=%u, writeFdNum=%u",
-        __func__,
-        dst,
-        result,
-        readFdNum,
-        writeFdNum
-    );
+    /* 状態遷移初期化 */
+    ret = MLibStateInit( &gStateHdl,
+                         gStt,
+                         sizeof ( gStt ),
+                         STATE_INI,
+                         &err             );
 
-    /* バッファ確保 */
-    pMsg = malloc( size );
-
-    /* 確保結果判定 */
-    if ( pMsg == NULL ) {
+    /* 初期化結果判定 */
+    if ( ret != MLIB_SUCCESS ) {
         /* 失敗 */
-        DEBUG_LOG_ERR( "malloc(): %u", size );
-        DEBUG_LOG_FNC( "%s():end.", __func__ );
-        return;
+        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, err );
     }
-
-    /* バッファ初期化 */
-    memset( pMsg, 0, size );
-
-    /* メッセージ設定 */
-    pMsg->header.funcId = MVFS_FUNCID_READ;
-    pMsg->header.type   = MVFS_TYPE_RESP;
-    pMsg->result        = result;
-
-    /* 読込レディグローバルFDリスト設定 */
-    memcpy( &( pMsg->fd[ 0 ] ),
-            pReadFdList,
-            sizeof ( uint32_t ) * readFdNum );
-
-    /* 書込レディグローバルFDリスト設定 */
-    memcpy( &( pMsg->fd[ readFdNum ] ),
-            pWriteFdList,
-            sizeof ( uint32_t ) * writeFdNum );
-
-    /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, pMsg, size, &err );
-
-    /* 送信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
-        /* 失敗 */
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
-    }
-
-    /* バッファ解放 */
-    free( pMsg );
 
     DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
 
+/******************************************************************************/
+/* ローカル関数定義                                                           */
+/******************************************************************************/
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0101
@@ -385,7 +291,7 @@ static MLibState_t Task0101( void *pArg )
             /* 失敗 */
 
             /* Select応答メッセージ送信 */
-            SendMsgSelectResp( pParam->taskId,
+            MsgSendSelectResp( pParam->taskId,
                                MVFS_RESULT_FAILURE,
                                NULL,
                                0,
@@ -408,7 +314,7 @@ static MLibState_t Task0101( void *pArg )
             /* 失敗 */
 
             /* Select応答メッセージ送信 */
-            SendMsgSelectResp( pParam->taskId,
+            MsgSendSelectResp( pParam->taskId,
                                MVFS_RESULT_FAILURE,
                                NULL,
                                0,
@@ -502,7 +408,7 @@ static MLibState_t Task0101( void *pArg )
         /* レディ有り・有効、または、無効 */
 
         /* Select応答メッセージ送信 */
-        SendMsgSelectResp( pParam->taskId,
+        MsgSendSelectResp( pParam->taskId,
                            MVFS_RESULT_SUCCESS,
                            pReadFdList,
                            readFdNum,
@@ -586,7 +492,7 @@ static MLibState_t Task0202( void *pArg )
         /* 必要 */
 
         /* Select応答メッセージ送信 */
-        SendMsgSelectResp( gSelectTaskId,
+        MsgSendSelectResp( gSelectTaskId,
                            MVFS_RESULT_SUCCESS,
                            &( pMsg->globalFd ),
                            readFdNum,

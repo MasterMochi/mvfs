@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
-/* src/mvfs/Open.c                                                            */
-/*                                                                 2019/09/03 */
+/* src/mvfs/Fn/FnOpen.c                                                       */
+/*                                                                 2019/09/18 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -19,14 +19,16 @@
 #include <libmk.h>
 #include <MLib/MLibState.h>
 
-/* モジュール共通ヘッダ */
+/* 外部モジュールヘッダ */
 #include <mvfs.h>
+#include <Debug.h>
+#include <Fd.h>
+#include <Fn.h>
+#include <Msg.h>
+#include <Node.h>
 
-/* モジュールヘッダ */
-#include "Debug.h"
-#include "Fd.h"
-#include "Open.h"
-#include "Node.h"
+/* 内部モジュールヘッダ */
+#include "FnOpen.h"
 
 
 /******************************************************************************/
@@ -37,7 +39,7 @@
 #define STATE_VFSOPEN_RESP_WAIT ( 2 )   /**< vfsOpen応答待ち */
 
 /* イベント */
-#define EVENT_OPEN_REQ     ( 1 )    /**< open要求イベント    */
+#define EVENT_OPEN_REQ     ( 1 )    /**< Open要求イベント    */
 #define EVENT_VFSOPEN_RESP ( 2 )    /**< vfsOpen応答イベント */
 
 /** 状態遷移タスクパラメータ */
@@ -50,16 +52,6 @@ typedef struct {
 /******************************************************************************/
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
-/* open応答メッセージ送信 */
-static void SendMsgOpenResp( MkTaskId_t taskId,
-                             uint32_t   result,
-                             uint32_t   globalFd );
-/* vfsOpen要求メッセージ送信 */
-static void SendMsgVfsOpenReq( MkTaskId_t dst,
-                               MkPid_t    pid,
-                               uint32_t   fd,
-                               const char *pPath );
-
 /* 状態遷移タスク */
 static MLibState_t Task0101( void *pArg );
 static MLibState_t Task0202( void *pArg );
@@ -88,44 +80,8 @@ static uint32_t gGlobalFd;
 
 
 /******************************************************************************/
-/* グローバル関数定義                                                         */
+/* 外部モジュール向けグローバル関数定義                                       */
 /******************************************************************************/
-/******************************************************************************/
-/**
- * @brief       Open機能初期化
- * @details     状態遷移を初期化する。
- */
-/******************************************************************************/
-void OpenInit( void )
-{
-    uint32_t  errNo;    /* エラー番号 */
-    MLibRet_t ret;      /* MLIB戻り値 */
-
-    DEBUG_LOG_FNC( "%s(): start.", __func__ );
-
-    /* 初期化 */
-    errNo = MLIB_STATE_ERR_NONE;
-    ret   = MLIB_FAILURE;
-
-    /* 状態遷移初期化 */
-    ret = MLibStateInit( &gStateHdl,
-                         gStt,
-                         sizeof ( gStt ),
-                         STATE_INI,
-                         &errNo           );
-
-    /* 初期化結果判定 */
-    if ( ret != MLIB_SUCCESS ) {
-        /* 失敗 */
-
-        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, errNo );
-    }
-
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
-    return;
-}
-
-
 /******************************************************************************/
 /**
  * @brief       vfsOpen応答メッセージ受信
@@ -136,7 +92,7 @@ void OpenInit( void )
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
+void FnOpenRecvVfsOpenResp( MkTaskId_t taskId,
                             void       *pBuffer )
 {
     uint32_t         errNo;     /* エラー番号               */
@@ -187,15 +143,15 @@ void OpenRcvMsgVfsOpenResp( MkTaskId_t taskId,
 
 /******************************************************************************/
 /**
- * @brief       open要求メッセージ受信
- * @details     メッセージ送信元タスクID(taskId)からのopen要求メッセージを処理
+ * @brief       Open要求メッセージ受信
+ * @details     メッセージ送信元タスクID(taskId)からのOpen要求メッセージを処理
  *              する。
  *
  * @param[in]   taskId   メッセージ送信元タスクID
  * @param[in]   *pBuffer メッセージバッファ
  */
 /******************************************************************************/
-void OpenRcvMsgOpenReq( MkTaskId_t taskId,
+void FnOpenRecvOpenReq( MkTaskId_t taskId,
                         void       *pBuffer )
 {
     uint32_t         errNo;     /* エラー番号               */
@@ -229,8 +185,8 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
 
         DEBUG_LOG_ERR( "invalid path: %s", pMsg->path );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* Open応答メッセージ送信 */
+        MsgSendOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
         DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
@@ -254,8 +210,8 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
 
         DEBUG_LOG_ERR( "MLibStateExec(): ret=%d, err=0x%X", retMLib, errNo );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* Open応答メッセージ送信 */
+        MsgSendOpenResp( taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
         DEBUG_LOG_TRC( "%s(): end.", __func__ );
         return;
@@ -269,118 +225,47 @@ void OpenRcvMsgOpenReq( MkTaskId_t taskId,
 
 
 /******************************************************************************/
+/* 内部モジュール向けグローバル関数定義                                       */
+/******************************************************************************/
+/******************************************************************************/
+/**
+ * @brief       Open機能初期化
+ * @details     状態遷移を初期化する。
+ */
+/******************************************************************************/
+void OpenInit( void )
+{
+    uint32_t  errNo;    /* エラー番号 */
+    MLibRet_t ret;      /* MLIB戻り値 */
+
+    DEBUG_LOG_FNC( "%s(): start.", __func__ );
+
+    /* 初期化 */
+    errNo = MLIB_STATE_ERR_NONE;
+    ret   = MLIB_FAILURE;
+
+    /* 状態遷移初期化 */
+    ret = MLibStateInit( &gStateHdl,
+                         gStt,
+                         sizeof ( gStt ),
+                         STATE_INI,
+                         &errNo           );
+
+    /* 初期化結果判定 */
+    if ( ret != MLIB_SUCCESS ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR( "MLibStateInit(): ret=%d, err=0x%X", ret, errNo );
+    }
+
+    DEBUG_LOG_FNC( "%s(): end.", __func__ );
+    return;
+}
+
+
+/******************************************************************************/
 /* ローカル関数定義                                                           */
 /******************************************************************************/
-/******************************************************************************/
-/**
- * @brief       open応答メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にopen応答メッセージを送信する。
- *
- * @param[in]   dst      メッセージ送信先タスクID
- * @param[in]   result   処理結果
- *                  - MVFS_RESULT_SUCCESS 成功
- *                  - MVFS_RESULT_FAILURE 失敗
- * @param[in]   globalFd グローバルFD
- */
-/******************************************************************************/
-static void SendMsgOpenResp( MkTaskId_t dst,
-                             uint32_t   result,
-                             uint32_t   globalFd )
-{
-    MkRet_t           ret;      /* 関数戻り値 */
-    MkErr_t           err;      /* エラー内容 */
-    MvfsMsgOpenResp_t msg;      /* メッセージ */
-
-    /* 初期化 */
-    ret = MK_RET_FAILURE;
-    err = MK_ERR_NONE;
-    memset( &msg, 0, sizeof ( MvfsMsgOpenResp_t ) );
-
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_OPEN;
-    msg.header.type   = MVFS_TYPE_RESP;
-    msg.result        = result;
-    msg.globalFd      = globalFd;
-
-    DEBUG_LOG_TRC(
-        "%s(): dst=0x%X, result=%d, globalFd=%u",
-        __func__,
-        dst,
-        result,
-        globalFd
-    );
-
-    /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgOpenResp_t ), &err );
-
-    /* 送信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
-        /* 失敗 */
-
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
-    }
-
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
-    return;
-}
-
-
-/******************************************************************************/
-/**
- * @brief       vfsOpen要求メッセージ送信
- * @details     メッセージ送信先タスクID(dst)にvfsOpen要求メッセージを送信する。
- *
- * @param[in]   dst      メッセージ送信先タスクID
- * @param[in]   pid      プロセスID
- * @param[in]   globalFd グローバルFD
- * @param[in]   *pPath   ファイルパス（絶対パス）
- */
-/******************************************************************************/
-static void SendMsgVfsOpenReq( MkTaskId_t dst,
-                               MkPid_t    pid,
-                               uint32_t   globalFd,
-                               const char *pPath    )
-{
-    MkRet_t             ret;    /* 関数戻り値 */
-    MkErr_t             err;    /* エラー内容 */
-    MvfsMsgVfsOpenReq_t msg;    /* メッセージ */
-
-    /* 初期化 */
-    ret = MK_RET_FAILURE;
-    err = MK_ERR_NONE;
-    memset( &msg, 0, sizeof ( MvfsMsgVfsOpenReq_t ) );
-
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_VFSOPEN;
-    msg.header.type   = MVFS_TYPE_REQ;
-    msg.pid           = pid;
-    msg.globalFd      = globalFd;
-    strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
-
-    DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, pid=%u, globalFd=%u, pPath=%s",
-        __func__,
-        dst,
-        pid,
-        globalFd,
-        pPath
-    );
-
-    /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsOpenReq_t ), &err );
-
-    /* 送信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
-        /* 失敗 */
-
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
-    }
-
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
-    return;
-}
-
-
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0101
@@ -399,7 +284,7 @@ static MLibState_t Task0101( void *pArg )
     uint32_t         globalFd;  /* グローバルFD       */
     NodeInfo_t       *pNode;    /* ノード             */
     StateTaskParam_t *pParam;   /* 状態遷移パラメータ */
-    MvfsMsgOpenReq_t *pMsg;     /* open要求メッセージ */
+    MvfsMsgOpenReq_t *pMsg;     /* Open要求メッセージ */
 
     DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
 
@@ -417,8 +302,8 @@ static MLibState_t Task0101( void *pArg )
 
         DEBUG_LOG_ERR( "not exist: path=%s", pMsg->path );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* Open応答メッセージ送信 */
+        MsgSendOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
         DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
         return STATE_INI;
@@ -434,8 +319,8 @@ static MLibState_t Task0101( void *pArg )
             pNode->type
         );
 
-        /* open応答メッセージ送信 */
-        SendMsgOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
+        /* Open応答メッセージ送信 */
+        MsgSendOpenResp( pParam->taskId, MVFS_RESULT_FAILURE, MVFS_FD_NULL );
 
         DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
         return STATE_INI;
@@ -447,12 +332,12 @@ static MLibState_t Task0101( void *pArg )
                         pNode                               );
 
     /* vfsOpen要求メッセージ送信 */
-    SendMsgVfsOpenReq( pNode->mountTaskId,
+    MsgSendVfsOpenReq( pNode->mountTaskId,
                        MK_TASKID_TO_PID( pParam->taskId ),
                        globalFd,
                        pMsg->path                          );
 
-    /* [TODO]open要求元タスクID保存 */
+    /* [TODO]Open要求元タスクID保存 */
     gOpenTaskId = pParam->taskId;
     gGlobalFd   = globalFd;
 
@@ -464,7 +349,7 @@ static MLibState_t Task0101( void *pArg )
 /******************************************************************************/
 /**
  * @brief       状態遷移タスク0202
- * @details     open応答メッセージを送信する。
+ * @details     Open応答メッセージを送信する。
  *
  * @param[in]   *pArg 未使用
  *
@@ -477,8 +362,8 @@ static MLibState_t Task0202( void *pArg )
 {
     DEBUG_LOG_FNC( "%s(): start. pArg=%p", __func__, pArg );
 
-    /* open応答メッセージ送信 */
-    SendMsgOpenResp( gOpenTaskId, MVFS_RESULT_SUCCESS, gGlobalFd );
+    /* Open応答メッセージ送信 */
+    MsgSendOpenResp( gOpenTaskId, MVFS_RESULT_SUCCESS, gGlobalFd );
 
     DEBUG_LOG_FNC( "%s(): end. ret=%u", __func__, STATE_INI );
     return STATE_INI;
