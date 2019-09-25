@@ -132,7 +132,7 @@ LibMvfsRet_t LibMvfsClose( uint32_t fd,
     }
 
     /* ファイルディスクリプタ解放 */
-    FdFree( pFdInfo );
+    FdFree( pFdInfo->localFd );
 
     return LIBMVFS_RET_SUCCESS;
 }

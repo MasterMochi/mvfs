@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Open.c                                                         */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/09/25 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -119,7 +119,7 @@ LibMvfsRet_t LibMvfsOpen( uint32_t   *pLocalFd,
         /* 失敗 */
 
         /* ローカルFD解放 */
-        FdFree( pFdInfo );
+        FdFree( pFdInfo->localFd );
 
         return LIBMVFS_RET_FAILURE;
     }
@@ -132,7 +132,7 @@ LibMvfsRet_t LibMvfsOpen( uint32_t   *pLocalFd,
         /* 失敗 */
 
         /* ローカルFD解放 */
-        FdFree( pFdInfo );
+        FdFree( pFdInfo->localFd );
 
         return LIBMVFS_RET_FAILURE;
     }
@@ -142,7 +142,7 @@ LibMvfsRet_t LibMvfsOpen( uint32_t   *pLocalFd,
         /* 失敗 */
 
         /* ローカルFD解放 */
-        FdFree( pFdInfo );
+        FdFree( pFdInfo->localFd );
 
         /* エラー番号設定 */
         MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_SERVER );

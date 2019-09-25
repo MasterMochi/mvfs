@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.h                                                           */
-/*                                                                 2019/09/11 */
+/*                                                                 2019/09/25 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -34,7 +34,7 @@ typedef struct {
 /* FD割当 */
 extern FdInfo_t *FdAlloc( void );
 /* FD解放 */
-extern void FdFree( FdInfo_t *pFdInfo );
+extern void FdFree( uint32_t localFd );
 /* グローバルFD取得 */
 extern FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd );
 /* ローカルFD取得 */

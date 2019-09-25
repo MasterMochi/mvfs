@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/include/Fd.h                                                      */
-/*                                                                 2019/09/18 */
+/*                                                                 2019/09/24 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -42,7 +42,7 @@ extern uint32_t FdAlloc( uint32_t   localFd,
                          MkPid_t    pid,
                          NodeInfo_t *pNode   );
 /* FD解放 */
-extern void FdFree( FdInfo_t *pFdInfo );
+extern void FdFree( uint32_t globalFd );
 /* FD情報取得 */
 extern FdInfo_t *FdGet( uint32_t globalFd );
 /* FD管理初期化 */

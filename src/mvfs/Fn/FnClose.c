@@ -343,7 +343,7 @@ static MLibState_t Task0202( void *pArg )
     pMsg   = ( MvfsMsgVfsCloseResp_t * ) pParam->pBuffer;
 
     /* ファイルディスクリプタ解放 */
-    FdFree( pParam->pFdInfo );
+    FdFree( pMsg->globalFd );
 
     /* Close応答メッセージ送信 */
     MsgSendCloseResp( gCloseTaskId, pMsg->result );

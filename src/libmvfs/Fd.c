@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.c                                                           */
-/*                                                                 2019/07/11 */
+/*                                                                 2019/09/25 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -14,7 +14,9 @@
 #include <string.h>
 
 /* ライブラリヘッダ */
-#include <MLib/MLibList.h>
+#include <libmvfs.h>
+#include <MLib/MLib.h>
+#include <MLib/MLibDynamicArray.h>
 
 /* モジュール共通ヘッダ */
 #include <mvfs.h>
@@ -26,32 +28,26 @@
 /******************************************************************************/
 /* 定義                                                                       */
 /******************************************************************************/
-/** FDテーブルエントリ最小インデックス */
-#define FDTABLE_ENTRY_IDX_MIN (  0 )
-/** FDテーブルエントリ最大インデックス */
-#define FDTABLE_ENTRY_IDX_MAX ( 32 )
-/** FDテーブルエントリ数 */
-#define FDTABLE_ENTRY_NUM     ( FDTABLE_ENTRY_IDX_MAX + 1 )
-
-/** FDテーブル */
-typedef struct {
-    MLibListNode_t link;                        /**< リンクリスト情報 */
-    FdInfo_t       fdInfo[ FDTABLE_ENTRY_NUM ]; /**< FD情報           */
-} FdTable_t;
+/** FDテーブルチャンク内エントリ数 */
+#define FDTABLE_CHUNK_SIZE ( 32 )
 
 
 /******************************************************************************/
 /* ローカル関数宣言                                                           */
 /******************************************************************************/
-/* FDテーブル追加 */
-static FdTable_t *AddFdTable( void );
+/* グローバル情報判定 */
+static bool CheckGlobalFdInfo( uint_t  idx,
+                               void    *pEntry,
+                               va_list vaList   );
+/* FDテーブル初期化 */
+static void InitFdTable( void );
 
 
 /******************************************************************************/
-/* 静的グローバル変数定義                                                     */
+/* グローバル変数定義                                                         */
 /******************************************************************************/
-/** FDテーブルリスト */
-static MLibList_t gFdTableList = { 0 };
+/** FDテーブル */
+static MLibDynamicArray_t *pgFdTable = NULL;
 
 
 /******************************************************************************/
@@ -69,52 +65,44 @@ static MLibList_t gFdTableList = { 0 };
 /******************************************************************************/
 FdInfo_t *FdAlloc( void )
 {
-    uint32_t  idx;          /* インデックス */
-    FdTable_t *pFdTable;    /* FDテーブル   */
+    uint32_t  localFd;  /* ローカルFD */
+    FdInfo_t  *pFdInfo; /* FD情報     */
+    MLibRet_t retMLib;  /* MLIB戻り値 */
+    MLibErr_t errMLib;  /* MLIBエラー */
 
     /* 初期化 */
-    pFdTable = NULL;
+    localFd = 0;
+    pFdInfo = NULL;
+    retMLib = MLIB_RET_FAILURE;
+    errMLib = MLIB_ERR_NONE;
 
-    while ( true ) {
-        /* FDテーブル取得 */
-        pFdTable = ( FdTable_t * )
-                   MLibListGetNextNode( &gFdTableList,
-                                        ( MLibListNode_t * ) pFdTable );
+    /* FDテーブル初期化判定 */
+    if ( pgFdTable == NULL ) {
+        /* 未初期化 */
 
-        /* 取得結果判定 */
-        if ( pFdTable == NULL ) {
-            /* FDテーブル無し */
-
-            /* FDテーブル追加 */
-            pFdTable = AddFdTable();
-
-            /* 追加結果判定 */
-            if ( pFdTable == NULL ) {
-                /* 失敗 */
-
-                break;
-            }
-        }
-
-        /* FDテーブルエントリ毎に繰り返し */
-        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
-              idx <= FDTABLE_ENTRY_IDX_MAX;
-              idx++                         ) {
-            /* エントリ未使用チェック */
-            if ( pFdTable->fdInfo[ idx ].used == false ) {
-                /* 未使用 */
-
-                /* エントリ割当て */
-                pFdTable->fdInfo[ idx ].used     = true;
-                pFdTable->fdInfo[ idx ].writeIdx = 0;
-                pFdTable->fdInfo[ idx ].readIdx  = 0;
-
-                return &( pFdTable->fdInfo[ idx ] );
-            }
-        }
+        /* 初期化 */
+        InitFdTable();
     }
 
-    return NULL;
+    /* FD情報割当 */
+    retMLib = MLibDynamicArrayAlloc( pgFdTable,
+                                     &localFd,
+                                     ( void ** ) &pFdInfo,
+                                     &errMLib              );
+
+    /* 割当結果判定 */
+    if ( retMLib != MLIB_RET_SUCCESS ) {
+        /* 失敗 */
+        return NULL;
+    }
+
+    /* FD情報初期化 */
+    memset( pFdInfo, 0, sizeof ( FdInfo_t ) );
+    pFdInfo->localFd  = localFd;
+    pFdInfo->writeIdx = 0;
+    pFdInfo->readIdx  = 0;
+
+    return pFdInfo;
 }
 
 
@@ -123,13 +111,20 @@ FdInfo_t *FdAlloc( void )
  * @brief       FD解放
  * @details     FDを解放する。
  *
- * @param[in]   *pFdInfo FD情報
+ * @param[in]   localFd ローカルファイルディスクリプタ
  */
 /******************************************************************************/
-void FdFree( FdInfo_t *pFdInfo )
+void FdFree( uint32_t localFd )
 {
-    /* 未使用フラグ設定 */
-    pFdInfo->used = false;
+    /* FDテーブル初期化判定 */
+    if ( pgFdTable == NULL ) {
+        /* 未初期化 */
+
+        return;
+    }
+
+    /* FD情報解放 */
+    MLibDynamicArrayFree( pgFdTable, localFd, NULL );
 
     return;
 }
@@ -149,40 +144,40 @@ void FdFree( FdInfo_t *pFdInfo )
 /******************************************************************************/
 FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd )
 {
-    uint32_t  idx;          /* インデックス */
-    FdTable_t *pFdTable;    /* FDテーブル   */
+    uint32_t  localFd;  /* ローカルFD     */
+    FdInfo_t  *pFdInfo; /* FD情報         */
+    MLibRet_t retMLib;  /* MLIB戻り値     */
+    MLibErr_t errMLib;  /* MLIBエラー要因 */
 
     /* 初期化 */
-    pFdTable = NULL;
+    localFd = 0;
+    pFdInfo = NULL;
+    retMLib = MLIB_RET_FAILURE;
+    errMLib = MLIB_ERR_NONE;
 
-    /* FDテーブルエントリ毎に繰り返し */
-    while ( true ) {
-        /* FDテーブル取得 */
-        pFdTable = ( FdTable_t * )
-                   MLibListGetNextNode( &gFdTableList,
-                                        ( MLibListNode_t * ) pFdTable );
+    /* FDテーブル初期化判定 */
+    if ( pgFdTable == NULL ) {
+        /* 未初期化 */
 
-        /* 取得結果判定 */
-        if ( pFdTable == NULL ) {
-            /* FDテーブル無し */
-
-            break;
-        }
-
-        /* FD情報毎に繰り返し */
-        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
-              idx <= FDTABLE_ENTRY_IDX_MAX;
-              idx++                         ) {
-            /* グローバルFD比較 */
-            if ( pFdTable->fdInfo[ idx ].globalFd == globalFd ) {
-                /* 該当 */
-
-                return &( pFdTable->fdInfo[ idx ] );
-            }
-        }
+        return NULL;
     }
 
-    return NULL;
+    /* FDテーブル検索 */
+    retMLib = MLibDynamicArraySearch( pgFdTable,
+                                      &localFd,
+                                      ( void ** ) &pFdInfo,
+                                      &errMLib,
+                                      CheckGlobalFdInfo,
+                                      globalFd              );
+
+    /* 検索結果判定 */
+    if ( retMLib != MLIB_RET_SUCCESS ) {
+        /* 失敗 */
+
+        return NULL;
+    }
+
+    return pFdInfo;
 }
 
 
@@ -200,40 +195,35 @@ FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd )
 /******************************************************************************/
 FdInfo_t *FdGetLocalFdInfo( uint32_t localFd )
 {
-    uint32_t  idx;          /* インデックス */
-    FdTable_t *pFdTable;    /* FDテーブル   */
+    FdInfo_t *pFdInfo;  /* FD情報         */
+    MLibRet_t retMLib;  /* MLIB戻り値     */
+    MLibErr_t errMLib;  /* MLIBエラー要因 */
 
     /* 初期化 */
-    pFdTable = NULL;
+    pFdInfo = NULL;
+    retMLib = MLIB_RET_FAILURE;
+    errMLib = MLIB_ERR_NONE;
 
-    /* FDテーブルエントリ毎に繰り返し */
-    while ( true ) {
-        /* FDテーブル取得 */
-        pFdTable = ( FdTable_t * )
-                   MLibListGetNextNode( &gFdTableList,
-                                        ( MLibListNode_t * ) pFdTable );
+    /* FDテーブル初期化判定 */
+    if ( pgFdTable == NULL ) {
+        /* 未初期化 */
 
-        /* 取得結果判定 */
-        if ( pFdTable == NULL ) {
-            /* FDテーブル無し */
-
-            break;
-        }
-
-        /* FD情報毎に繰り返し */
-        for ( idx  = FDTABLE_ENTRY_IDX_MIN;
-              idx <= FDTABLE_ENTRY_IDX_MAX;
-              idx++                         ) {
-            /* ローカルFD比較 */
-            if ( pFdTable->fdInfo[ idx ].localFd == localFd ) {
-                /* 該当 */
-
-                return &( pFdTable->fdInfo[ idx ] );
-            }
-        }
+        return NULL;
     }
 
-    return NULL;
+    /* FD情報取得 */
+    retMLib = MLibDynamicArrayGet( pgFdTable,
+                                   localFd,
+                                   ( void ** ) &pFdInfo,
+                                   &errMLib              );
+
+    /* 取得結果判定 */
+    if ( retMLib != MLIB_RET_SUCCESS ) {
+        /* 失敗 */
+        return NULL;
+    }
+
+    return pFdInfo;;
 }
 
 
@@ -242,69 +232,57 @@ FdInfo_t *FdGetLocalFdInfo( uint32_t localFd )
 /******************************************************************************/
 /******************************************************************************/
 /**
- * @brief       FDテーブル追加
- * @details     FDテーブルリストに新しいFDテーブルを追加する。
+ * @brief       グローバルFD情報判定
+ * @details     FD情報が引数globalFdに一致するか判定する。
  *
- * @return      追加したFDテーブルへのポインタを返す。
- * @retval      NULL     追加失敗
- * @retval      NULL以外 追加成功
+ * @param[in]   idx     エントリインデックス
+ * @param[in]   *pEntry エントリアドレス
+ * @param[in]   vaList  可変長変数リスト
+ *
+ * @return      判定結果を返す。
+ * @retval      true  一致
+ * @retval      false 不一致
  */
 /******************************************************************************/
-static FdTable_t *AddFdTable( void )
+static bool CheckGlobalFdInfo( uint_t  idx,
+                               void    *pEntry,
+                               va_list vaList   )
 {
-    uint32_t  localFd;  /* ローカルFD       */
-    uint32_t  idx;      /* インデックス     */
-    FdTable_t *pLast;   /* 最後尾FDテーブル */
-    FdTable_t *pAdd;    /* 追加FDテーブル   */
+    uint32_t globalFd;  /* グローバルFD */
+    FdInfo_t *pFdInfo;  /* FD情報       */
 
     /* 初期化 */
-    localFd = 0;
-    idx     = 0;
-    pLast   = NULL;
-    pAdd    = NULL;
+    globalFd = va_arg( vaList, uint32_t );
+    pFdInfo  = ( FdInfo_t * ) pEntry;
 
-    /* リスト最後尾FDテーブル取得 */
-    pLast = ( FdTable_t * ) MLibListGetPrevNode( &gFdTableList, NULL );
+    /* グローバルFD判定 */
+    if ( pFdInfo->globalFd == globalFd ) {
+        /* 一致 */
 
-    /* 取得結果判定 */
-    if ( pLast == NULL ) {
-        /* FDテーブル無し */
-
-        /* ローカルFD初期化 */
-        localFd = MVFS_FD_NULL;
-
-    } else {
-        /* FDテーブル有り */
-
-        /* 最老番ローカルFD取得 */
-        localFd = pLast->fdInfo[ FDTABLE_ENTRY_IDX_MAX ].globalFd;
+        return true;
     }
 
-    /* FDテーブル割当 */
-    pAdd = malloc( sizeof ( FdTable_t ) );
-
-    /* 割当結果判定 */
-    if ( pAdd == NULL ) {
-        /* 失敗 */
-
-        return NULL;
-    }
-
-    /* FDテーブル初期化 */
-    memset( pAdd, 0, sizeof ( FdTable_t ) );
-
-    /* FDテーブルエントリ毎に繰り返し */
-    for ( idx = FDTABLE_ENTRY_IDX_MIN; idx <= FDTABLE_ENTRY_IDX_MAX; idx++ ) {
-        pAdd->fdInfo[ idx ].used    = false;
-        pAdd->fdInfo[ idx ].localFd = ++localFd;
-    }
-
-    /* リスト最後尾挿入 */
-    MLibListInsertTail( &gFdTableList, ( MLibListNode_t * ) pAdd );
-
-    return pAdd;
+    return false;
 }
 
 
 /******************************************************************************/
+/**
+ * @brief       FDテーブル初期化
+ * @details     FDテーブルを初期化する。
+ */
+/******************************************************************************/
+static void InitFdTable( void )
+{
+    /* FDテーブル初期化 */
+    MLibDynamicArrayInit( &pgFdTable,
+                          FDTABLE_CHUNK_SIZE,
+                          sizeof ( FdInfo_t ),
+                          LIBMVFS_FD_MAXNUM,
+                          NULL                 );
 
+    return;
+}
+
+
+/******************************************************************************/
