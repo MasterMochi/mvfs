@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Read.c                                                         */
-/*                                                                 2019/09/11 */
+/*                                                                 2019/10/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -195,6 +195,12 @@ LibMvfsRet_t LibMvfsRead( uint32_t  fd,
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_SERVER );
 
             return LIBMVFS_RET_FAILURE;
+        }
+
+        /* 読込みサイズ判定 */
+        if ( pRespMsg->size == 0 ) {
+            /* EOF */
+            break;
         }
 
         /* 読込みバッファコピー */

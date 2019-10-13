@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/include/Fd.h                                                      */
-/*                                                                 2019/09/24 */
+/*                                                                 2019/10/01 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -12,9 +12,13 @@
 /******************************************************************************/
 /* 標準ヘッダ */
 #include <stdbool.h>
+#include <stdint.h>
 
 /* カーネルヘッダ */
 #include <kernel/types.h>
+
+/* ライブラリヘッダ */
+#include <MLib/MLibState.h>
 
 /* 外部モジュールヘッダ */
 #include <Node.h>
@@ -25,12 +29,12 @@
 /******************************************************************************/
 /** ファイルディスクリプタ情報 */
 typedef struct {
-    bool       used;        /**< 使用済みフラグ */
-    uint32_t   globalFd;    /**< グローバルFD   */
-    uint32_t   localFd;     /**< ローカルFD     */
-    MkPid_t    pid;         /**< PID            */
-    NodeInfo_t *pNode;      /**< ノード         */
-    uint32_t   select;      /**< 監視状態       */
+    bool              used;     /**< 使用済みフラグ   */
+    uint32_t          globalFd; /**< グローバルFD     */
+    uint32_t          localFd;  /**< ローカルFD       */
+    MkTaskId_t        taskId;   /**< タスクID         */
+    NodeInfo_t        *pNode;   /**< ノード           */
+    MLibStateHandle_t stateHdl; /**< 状態遷移ハンドル */
 } FdInfo_t;
 
 
@@ -38,9 +42,8 @@ typedef struct {
 /* グローバル関数宣言                                                         */
 /******************************************************************************/
 /* FD割当 */
-extern uint32_t FdAlloc( uint32_t   localFd,
-                         MkPid_t    pid,
-                         NodeInfo_t *pNode   );
+extern FdInfo_t *FdAlloc( uint32_t   localFd,
+                          NodeInfo_t *pNode   );
 /* FD解放 */
 extern void FdFree( uint32_t globalFd );
 /* FD情報取得 */

@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/include/Fn.h                                                           */
-/*                                                                 2019/09/18 */
+/*                                                                 2019/10/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -10,6 +10,9 @@
 /******************************************************************************/
 /* インクルード                                                               */
 /******************************************************************************/
+/* 標準ヘッダ */
+#include <stddef.h>
+
 /* カーネルヘッダ */
 #include <kernel/types.h>
 
@@ -17,41 +20,52 @@
 /******************************************************************************/
 /* 外部モジュール向けグローバル関数宣言                                       */
 /******************************************************************************/
-/* Closeメッセージ受信 */
-extern void FnCloseRecvCloseReq( MkTaskId_t taskId,
-                                 void       *pBuffer );
-/* VfsClose応答メッセージ受信 */
-extern void FnCloseRecvVfsCloseResp( MkTaskId_t taskId,
-                                     void       *pBuffer );
 /* 機能初期化 */
 extern void FnInit( void );
-/* Mount要求メッセージ受信 */
-extern void FnMountRecvMountReq( MkTaskId_t taskId,
-                                 void       *pBuffer );
+/* Closeメッセージ受信 */
+extern void FnMainRecvCloseReq( MkTaskId_t taskId,
+                                void       *pBuffer,
+                                size_t     size      );
 /* Openメッセージ受信 */
-extern void FnOpenRecvOpenReq( MkTaskId_t taskId,
-                               void       *pBuffer );
-/* VfsOpen応答メッセージ受信 */
-extern void FnOpenRecvVfsOpenResp( MkTaskId_t taskId,
-                                   void       *pBuffer );
+extern void FnMainRecvOpenReq( MkTaskId_t taskId,
+                               void       *pBuffer,
+                               size_t     size      );
 /* Read要求メッセージ受信 */
-extern void FnReadRecvReadReq( MkTaskId_t taskId,
-                               void       *pBuffer );
+extern void FnMainRecvReadReq( MkTaskId_t taskId,
+                               void       *pBuffer,
+                               size_t     size      );
+/* VfsClose応答メッセージ受信 */
+extern void FnMainRecvVfsCloseResp( MkTaskId_t taskId,
+                                    void       *pBuffer,
+                                    size_t     size      );
+/* VfsOpen応答メッセージ受信 */
+extern void FnMainRecvVfsOpenResp( MkTaskId_t taskId,
+                                   void       *pBuffer,
+                                   size_t     size      );
 /* VfsRead応答メッセージ受信 */
-extern void FnReadRecvVfsReadResp( MkTaskId_t taskId,
-                                   void       *pBuffer );
-/* Select要求メッセージ受信 */
-extern void FnSelectRecvSelectReq( MkTaskId_t taskId,
-                                   void       *pBuffer );
-/* VfsReady通知メッセージ受信 */
-extern void FnSelectRecvVfsReadyNtc( MkTaskId_t taskId,
-                                     void       *pBuffer );
+extern void FnMainRecvVfsReadResp( MkTaskId_t taskId,
+                                   void       *pBuffer,
+                                   size_t     size      );
 /* VfsWrite応答メッセージ受信 */
-extern void FnWriteRecvVfsWriteResp( MkTaskId_t taskId,
-                                     void       *pBuffer );
+extern void FnMainRecvVfsWriteResp( MkTaskId_t taskId,
+                                    void       *pBuffer,
+                                    size_t     size      );
 /* Write要求メッセージ受信 */
-extern void FnWriteRecvWriteReq( MkTaskId_t taskId,
-                                 void       *pBuffer );
+extern void FnMainRecvWriteReq( MkTaskId_t taskId,
+                                void       *pBuffer,
+                                size_t     size      );
+/* Mount要求メッセージ受信 */
+extern void FnTaskRecvMountReq( MkTaskId_t taskId,
+                                void       *pBuffer,
+                                size_t     size      );
+/* Select要求メッセージ受信 */
+extern void FnTaskRecvSelectReq( MkTaskId_t taskId,
+                                 void       *pBuffer,
+                                 size_t     size      );
+/* VfsReady通知メッセージ受信 */
+extern void FnTaskRecvVfsReadyNtc( MkTaskId_t taskId,
+                                   void       *pBuffer,
+                                   size_t     size      );
 
 
 /******************************************************************************/

@@ -1,7 +1,7 @@
 #******************************************************************************#
 #*                                                                            *#
 #* src/Makefile                                                               *#
-#*                                                                 2019/09/18 *#
+#*                                                                 2019/10/07 *#
 #* Copyright (C) 2018-2019 Mochi.                                             *#
 #*                                                                            *#
 #******************************************************************************#
@@ -15,12 +15,8 @@ PROG = mvfs
 SRCS  = main.c
 SRCS += Fd/Fd.c
 SRCS += Fn/Fn.c
-SRCS += Fn/FnClose.c
-SRCS += Fn/FnMount.c
-SRCS += Fn/FnOpen.c
-SRCS += Fn/FnRead.c
-SRCS += Fn/FnSelect.c
-SRCS += Fn/FnWrite.c
+SRCS += Fn/FnMain.c
+SRCS += Fn/FnTask.c
 SRCS += Msg/Msg.c
 SRCS += Node/Node.c
 
@@ -38,7 +34,7 @@ CFLAGS += -m32
 CFLAGS += -fno-pic
 CFLAGS += -static
 CFLAGS += -masm=intel
-CFLAGS += -DDEBUG_LOG_LV=2
+CFLAGS += -DDEBUG_LOG_LV=3
 CFLAGS += -Iinclude
 CFLAGS += -I../include
 CFLAGS += -I$(BUILD_DIR)/include

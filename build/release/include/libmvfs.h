@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2019/09/17 */
+/*                                                                 2019/10/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -152,8 +152,9 @@ extern LibMvfsRet_t LibMvfsSendVfsCloseResp( uint32_t globalFd,
                                              uint32_t result,
                                              uint32_t *pErrNo   );
 /* VfsOpen応答メッセージ送信 */
-extern LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
-                                            uint32_t *pErrNo );
+extern LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t globalFd,
+                                            uint32_t result,
+                                            uint32_t *pErrNo   );
 /* VfsRead応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
                                             uint32_t result,
@@ -162,9 +163,9 @@ extern LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
                                             size_t   size,
                                             uint32_t *pErrNo   );
 /* VfsReady通知メッセージ送信 */
-extern LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
-                                            uint32_t ready,
-                                            uint32_t *pErrNo   );
+extern LibMvfsRet_t LibMvfsSendVfsReadyNtc( const char *pPath,
+                                            uint32_t   ready,
+                                            uint32_t   *pErrNo );
 /* VfsWrite応答メッセージ送信 */
 extern LibMvfsRet_t LibMvfsSendVfsWriteResp( uint32_t globalFd,
                                              uint32_t result,

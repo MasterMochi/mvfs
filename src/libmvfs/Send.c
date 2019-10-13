@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Send.c                                                         */
-/*                                                                 2019/09/17 */
+/*                                                                 2019/10/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -37,8 +37,9 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
                                       uint32_t   *pErrNo   );
 /* vfsOpen応答送信 */
 static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
+                                     uint32_t   globalFd,
                                      uint32_t   result,
-                                     uint32_t   *pErrNo );
+                                     uint32_t   *pErrNo   );
 /* vfsRead応答送信 */
 static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      uint32_t   globalFd,
@@ -49,9 +50,9 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
                                      uint32_t   *pErrNo   );
 /* vfsReady通知送信 */
 static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
-                                     uint32_t   globalFd,
+                                     const char *pPath,
                                      uint32_t   ready,
-                                     uint32_t   *pErrNo   );
+                                     uint32_t   *pErrNo );
 /* vfsWrite応答送信 */
 static LibMvfsRet_t SendVfsWriteResp( MkTaskId_t taskId,
                                       uint32_t   globalFd,
@@ -127,10 +128,11 @@ LibMvfsRet_t LibMvfsSendVfsCloseResp( uint32_t globalFd,
  * @brief       vfsOpen応答送信
  * @details     仮想ファイルサーバにvfsOpen応答メッセージを送信する。
  *
- * @param[in]   result  処理結果
+ * @param[in]   globalFd グローバルファイルディスクリプタ
+ * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
- * @param[out]  *pErrNo エラー番号
+ * @param[out]  *pErrNo  エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
  *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバが不明
  *                  -
@@ -140,8 +142,9 @@ LibMvfsRet_t LibMvfsSendVfsCloseResp( uint32_t globalFd,
  * @retval      LIBMVFS_RET_FAILURE 異常終了
  */
 /******************************************************************************/
-LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
-                                     uint32_t *pErrNo )
+LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t globalFd,
+                                     uint32_t result,
+                                     uint32_t *pErrNo   )
 {
     int32_t    ret;     /* 関数戻り値 */
     MkTaskId_t taskId;  /* タスクID   */
@@ -172,7 +175,7 @@ LibMvfsRet_t LibMvfsSendVfsOpenResp( uint32_t result,
     }
 
     /* vfsOpen応答メッセージ送信 */
-    ret = SendVfsOpenResp( taskId, result, pErrNo );
+    ret = SendVfsOpenResp( taskId, globalFd, result, pErrNo );
 
     return ret;
 }
@@ -257,11 +260,11 @@ LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
  * @brief       vfsReady通知送信
  * @details     仮想ファイルサーバにvfsReady通知メッセージを送信する。
  *
- * @param[in]   globalFd グローバルファイスディスクリプタ
- * @param[in]   ready    読込/書込レディフラグ
+ * @param[in]   *pPath  ファイルパス
+ * @param[in]   ready   読込/書込レディフラグ
  *                  - MVFS_READY_READ  readレディ
  *                  - MVFS_READY_WRITE writeレディ
- * @param[out]  *pErrNo  エラー番号
+ * @param[out]  *pErrNo エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
  *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバが不明
  *
@@ -270,9 +273,9 @@ LibMvfsRet_t LibMvfsSendVfsReadResp( uint32_t globalFd,
  * @retval      LIBMVFS_RET_FAILURE 異常終了
  */
 /******************************************************************************/
-LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
-                                     uint32_t ready,
-                                     uint32_t *pErrNo   )
+LibMvfsRet_t LibMvfsSendVfsReadyNtc( const char *pPath,
+                                     uint32_t   ready,
+                                     uint32_t   *pErrNo )
 {
     int32_t    ret;     /* 関数戻り値 */
     MkTaskId_t taskId;  /* タスクID   */
@@ -292,7 +295,7 @@ LibMvfsRet_t LibMvfsSendVfsReadyNtc( uint32_t globalFd,
     }
 
     /* VfsReady通知メッセージ送信 */
-    ret = SendVfsReadyNtc( taskId, globalFd, ready, pErrNo );
+    ret = SendVfsReadyNtc( taskId, pPath, ready, pErrNo );
 
     return ret;
 }
@@ -450,11 +453,12 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
  * @brief       vfsOpen応答送信
  * @details     仮想ファイルサーバにvfsOpen応答メッセージを送信する。
  *
- * @param[in]   taskId  仮想ファイルサーバのタスクID
- * @param[in]   result  処理結果
+ * @param[in]   taskId   仮想ファイルサーバのタスクID
+ * @param[in]   globalFd グローバルファイルディスクリプタ
+ * @param[in]   result   処理結果
  *                  - MVFS_RESULT_SUCCESS 処理成功
  *                  - MVFS_RESULT_FAILURE 処理失敗
- * @param[in]   *pErrNo エラー番号
+ * @param[in]   *pErrNo  エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
  *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
  *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
@@ -466,6 +470,7 @@ static LibMvfsRet_t SendVfsCloseResp( MkTaskId_t taskId,
  */
 /******************************************************************************/
 static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
+                                     uint32_t   globalFd,
                                      uint32_t   result,
                                      uint32_t   *pErrNo )
 {
@@ -481,6 +486,7 @@ static LibMvfsRet_t SendVfsOpenResp( MkTaskId_t taskId,
     /* メッセージ作成 */
     msg.header.funcId = MVFS_FUNCID_VFSOPEN;
     msg.header.type   = MVFS_TYPE_RESP;
+    msg.globalFd      = globalFd;
     msg.result        = result;
 
     /* メッセージ送信 */
@@ -643,12 +649,12 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
  * @brief       vfsReady通知送信
  * @details     仮想ファイルサーバにvfsReady通知メッセージを送信する。
  *
- * @param[in]   taskId   仮想ファイルサーバのタスクID
- * @param[in]   globalFd グローバルファイルディスクリプタ
- * @param[in]   ready    読込/書込レディフラグ
+ * @param[in]   taskId  仮想ファイルサーバのタスクID
+ * @param[in]   *pPath  ファイルパス
+ * @param[in]   ready   読込/書込レディフラグ
  *                  - MVFS_READY_READ  readレディ
  *                  - MVFS_READY_WRITE writeレディ
- * @param[in]   *pErrNo  エラー番号
+ * @param[in]   *pErrNo エラー番号
  *                  - LIBMVFS_ERR_NONE      エラー無し
  *                  - LIBMVFS_ERR_NOT_FOUND 仮想ファイルサーバ不正
  *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
@@ -660,9 +666,9 @@ static LibMvfsRet_t SendVfsReadResp( MkTaskId_t taskId,
  */
 /******************************************************************************/
 static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
-                                     uint32_t   globalFd,
+                                     const char *pPath,
                                      uint32_t   ready,
-                                     uint32_t   *pErrNo   )
+                                     uint32_t   *pErrNo )
 {
     MkRet_t              ret;   /* カーネル戻り値     */
     MkErr_t              err;   /* カーネルエラー内容 */
@@ -676,8 +682,8 @@ static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
     /* メッセージ作成 */
     msg.header.funcId = MVFS_FUNCID_VFSREADY;
     msg.header.type   = MVFS_TYPE_NTC;
-    msg.globalFd      = globalFd;
     msg.ready         = ready;
+    memcpy( &( msg.path ), pPath, MVFS_PATH_MAXLEN );
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */

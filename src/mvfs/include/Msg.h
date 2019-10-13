@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/include/Msg.h                                                          */
-/*                                                                 2019/09/18 */
+/*                                                                 2019/10/07 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -17,11 +17,66 @@
 /* カーネルヘッダ */
 #include <kernel/types.h>
 
+/* 外部モジュールヘッダ */
+#include <mvfs.h>
+#include <Fd.h>
+#include <Node.h>
+
 
 /******************************************************************************/
 /* 外部モジュール向けグローバル関数宣言                                       */
 /******************************************************************************/
-/* Close応答めせーじ送信 */
+/* Close要求メッセージチェック */
+extern MvfsRet_t MsgCheckCloseReq( MkTaskId_t        taskId,
+                                   MvfsMsgCloseReq_t *pMsg,
+                                   size_t            size,
+                                   FdInfo_t          **ppFdInfo );
+/* Mount要求メッセージチェック */
+extern MvfsRet_t MsgCheckMountReq( MvfsMsgMountReq_t *pMsg,
+                                   size_t            size   );
+/* Open要求メッセージチェック */
+extern MvfsRet_t MsgCheckOpenReq( MvfsMsgOpenReq_t *pMsg,
+                                  size_t           size   );
+/* Read要求メッセージチェック */
+extern MvfsRet_t MsgCheckReadReq( MkTaskId_t       taskId,
+                                  MvfsMsgReadReq_t *pMsg,
+                                  size_t           size,
+                                  FdInfo_t         **ppFdInfo );
+/* Select要求メッセージチェック */
+extern MvfsRet_t MsgCheckSelectReq( MkTaskId_t         taskId,
+                                    MvfsMsgSelectReq_t *pMsg,
+                                    size_t             size    );
+/* VfsClose応答メッセージチェック */
+extern MvfsRet_t MsgCheckVfsCloseResp( MkTaskId_t            taskId,
+                                       MvfsMsgVfsCloseResp_t *pMsg,
+                                       size_t                size,
+                                       FdInfo_t              **ppFdInfo );
+/* VfsOpen応答メッセージチェック */
+extern MvfsRet_t MsgCheckVfsOpenResp( MkTaskId_t           taskId,
+                                      MvfsMsgVfsOpenResp_t *pMsg,
+                                      size_t               size,
+                                      FdInfo_t             **ppFdInfo );
+/* VfsRead応答メッセージチェック */
+extern MvfsRet_t MsgCheckVfsReadResp( MkTaskId_t           taskId,
+                                      MvfsMsgVfsReadResp_t *pMsg,
+                                      size_t               size,
+                                      FdInfo_t             **ppFdInfo );
+/* VfsReady通知メッセージチェック */
+extern MvfsRet_t MsgCheckVfsReadyNtc( MkTaskId_t           taskId,
+                                      MvfsMsgVfsReadyNtc_t *pMsg,
+                                      size_t               size,
+                                      NodeInfo_t           **ppNode );
+/* VfsWrite応答メッセージチェック */
+extern MvfsRet_t MsgCheckVfsWriteResp( MkTaskId_t            taskId,
+                                       MvfsMsgVfsWriteResp_t *pMsg,
+                                       size_t                size,
+                                       FdInfo_t              **ppFdInfo );
+/* Write応答メッセージチェック */
+extern MvfsRet_t MsgCheckWriteReq( MkTaskId_t        taskId,
+                                   MvfsMsgWriteReq_t *pMsg,
+                                   size_t            size,
+                                   FdInfo_t          **ppFdInfo );
+/* Close応答メッセージ送信 */
 extern void MsgSendCloseResp( MkTaskId_t dst,
                               uint32_t   result );
 /* Mount応答メッセージ送信 */

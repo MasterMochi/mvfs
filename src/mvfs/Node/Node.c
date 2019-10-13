@@ -71,13 +71,6 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
     uint32_t   idx;     /* インデックス   */
     NodeList_t *pList;  /* エントリリスト */
 
-    DEBUG_LOG_FNC(
-        "%s(): start. pNode=%p, pAddEntry=%p",
-        __func__,
-        pNode,
-        pAddEntry
-    );
-
     /* 先頭エントリリスト取得 */
     pList = ( NodeList_t * )
             MLibListGetNextNode( &( pNode->entryList ), NULL );
@@ -101,7 +94,6 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
                 /* エントリ設定 */
                 pList->pEntry[ idx ] = pAddEntry;
 
-                DEBUG_LOG_FNC( "%s(): end. ret=%d", __func__, MVFS_OK );
                 return MVFS_OK;
             }
         }
@@ -120,7 +112,6 @@ int32_t NodeAddEntry( NodeInfo_t *pNode,
         }
     }
 
-    DEBUG_LOG_FNC( "%s(): end. ret=%d", __func__, MVFS_NG );
     return MVFS_NG;
 }
 
@@ -149,23 +140,18 @@ NodeInfo_t *NodeCreate( const char *pName,
 {
     NodeInfo_t *pNode;  /* ノード */
 
-    DEBUG_LOG_FNC(
-        "%s(): start. pName=%s, pPath=%s, type=%u, mountTaskId=0x%X",
-        __func__,
-        pName,
-        pPath,
-        type,
-        mountTaskId
-    );
-
     /* ノード割当 */
     pNode = ( NodeInfo_t * ) malloc( sizeof ( NodeInfo_t ) );
 
     /* 割当結果判定 */
     if ( pNode == NULL ) {
         /* 失敗 */
-        DEBUG_LOG_ERR( "malloc(): %d", sizeof ( NodeInfo_t ) );
-        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
+
+        DEBUG_LOG_ERR(
+            "%s(): malloc(): size=%u",
+            __func__,
+            sizeof ( NodeInfo_t )
+        );
         return NULL;
     }
 
@@ -187,7 +173,15 @@ NodeInfo_t *NodeCreate( const char *pName,
     /* エントリリスト初期化 */
     MLibListInit( &( pNode->entryList ) );
 
-    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pNode );
+    DEBUG_LOG_TRC(
+        "%s(): pName=%s, pPath=%s, type=%#X, mountTaskId=%#X",
+        __func__,
+        pName,
+        pPath,
+        type,
+        mountTaskId
+    );
+
     return pNode;
 }
 
@@ -205,10 +199,9 @@ void NodeDelete( NodeInfo_t *pNode )
     NodeList_t *pList;      /* エントリリスト   */
     NodeList_t *pNextList;  /* 次エントリリスト */
 
-    DEBUG_LOG_FNC( "%s(): start. pNode=%p", __func__, pNode );
-
     /* エントリリスト取得 */
-    pList = ( NodeList_t * ) MLibListGetNextNode( &( pNode->entryList ), NULL );
+    pList = ( NodeList_t * )
+            MLibListGetNextNode( &( pNode->entryList ), NULL );
 
     /* エントリリスト毎に繰り返す */
     while ( pList != NULL ) {
@@ -227,7 +220,6 @@ void NodeDelete( NodeInfo_t *pNode )
     /* ノード情報解放 */
     free( pNode );
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -254,8 +246,6 @@ NodeInfo_t *NodeGet( const char *pPath )
     NodeInfo_t        *pNode;       /* ノード    　       */
     MLibSplitHandle_t *pHandle;     /* 文字列分割ハンドル */
 
-    DEBUG_LOG_FNC( "%s(): start. pPath=%s", __func__, pPath );
-
     /* 初期化 */
     pName   = NULL;
     num     = 0;
@@ -268,8 +258,8 @@ NodeInfo_t *NodeGet( const char *pPath )
     /* 絶対パス判定 */
     if ( pPath[ 0 ] != '/' ) {
         /* 絶対パスでない */
-        DEBUG_LOG_ERR( "invalid path: %s", pPath );
-        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
+
+        DEBUG_LOG_ERR( "%s(): invalid path: %s", __func__, pPath );
         return NULL;
     }
 
@@ -288,12 +278,12 @@ NodeInfo_t *NodeGet( const char *pPath )
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "MLibSplitInitByDelimiter(): ret=%d, err=0x%X, pPath=%s",
+            "%s(): MLibSplitInitByDelimiter(): ret=%d, err=%#X, pPath=%s",
+            __func__,
             retMLib,
             errNo,
             pPath
         );
-        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
@@ -315,10 +305,14 @@ NodeInfo_t *NodeGet( const char *pPath )
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "MLibSplitTerm(): ret=%d, err=0x%X", retMLib, errNo ) ;
+        DEBUG_LOG_ERR(
+            "%s(): MLibSplitTerm(): ret=%d, err=%#X",
+            __func__,
+            retMLib,
+            errNo
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pNode );
     return pNode;
 }
 
@@ -372,8 +366,6 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     MLibRet_t  retMLib; /* MLib関数戻り値 */
     NodeList_t *pList;  /* エントリリスト */
 
-    DEBUG_LOG_FNC( "%s(): start. pNode=%p", __func__, pNode );
-
     /* エントリリスト作成 */
     pList = ( NodeList_t * ) malloc( sizeof ( NodeList_t ) );
 
@@ -381,8 +373,11 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     if ( pList == NULL ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "malloc(): %d", sizeof ( NodeList_t ) );
-        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
+        DEBUG_LOG_ERR(
+            "%s(): malloc(): size=%u",
+            __func__,
+            sizeof ( NodeList_t )
+        );
         return NULL;
     }
 
@@ -397,16 +392,18 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
     if ( retMLib != MLIB_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "MLibListInsertTail(): ret=%d", retMLib );
+        DEBUG_LOG_ERR(
+            "%s(): MLibListInsertTail(): ret=%d",
+            __func__,
+            retMLib
+        );
 
         /* エントリリスト解放 */
         free( pList );
 
-        DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
         return NULL;
     }
 
-    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, pList );
     return pList;
 }
 
@@ -448,8 +445,6 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
     uint32_t   i;       /* カウンタ           */
     NodeList_t *pList;  /* ノードリスト       */
 
-    DEBUG_LOG_FNC( "%s(): start. pNode=%p, pName=%s", __func__, pNode, pName );
-
     /* 初期化 */
     pList = NULL;
 
@@ -477,11 +472,6 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
             if ( retCmp == 0 ) {
                 /* 一致 */
 
-                DEBUG_LOG_FNC(
-                    "%s(): end. ret=%p",
-                    __func__,
-                    pList->pEntry[ i ]
-                );
                 return pList->pEntry[ i ];
             }
         }
@@ -492,7 +482,6 @@ static NodeInfo_t *GetInNode( NodeInfo_t *pNode,
                                      ( MLibListNode_t * ) pList );
     }
 
-    DEBUG_LOG_FNC( "%s(): end. ret=%p", __func__, NULL );
     return NULL;
 }
 

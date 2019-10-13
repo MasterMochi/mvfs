@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/main.c                                                            */
-/*                                                                 2019/09/18 */
+/*                                                                 2019/10/13 */
 /* Copyright (C) 2018-2019 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -31,7 +31,8 @@
 /******************************************************************************/
 /* 機能呼出し関数テーブル型 */
 typedef void ( *Func_t )( MkTaskId_t taskId,
-                          void       *pParam );
+                          void       *pParam,
+                          size_t     size     );
 
 
 /******************************************************************************/
@@ -46,17 +47,17 @@ static void Loop( void );
 /******************************************************************************/
 /** 機能呼出し関数テーブル */
 static Func_t gFuncTbl[ MVFS_FUNCID_NUM ] =
-    { [ MVFS_FUNCID_MOUNT    ] = FnMountRecvMountReq,
-      [ MVFS_FUNCID_OPEN     ] = FnOpenRecvOpenReq,
-      [ MVFS_FUNCID_VFSOPEN  ] = FnOpenRecvVfsOpenResp,
-      [ MVFS_FUNCID_WRITE    ] = FnWriteRecvWriteReq,
-      [ MVFS_FUNCID_VFSWRITE ] = FnWriteRecvVfsWriteResp,
-      [ MVFS_FUNCID_READ     ] = FnReadRecvReadReq,
-      [ MVFS_FUNCID_VFSREAD  ] = FnReadRecvVfsReadResp,
-      [ MVFS_FUNCID_CLOSE    ] = FnCloseRecvCloseReq,
-      [ MVFS_FUNCID_VFSCLOSE ] = FnCloseRecvVfsCloseResp,
-      [ MVFS_FUNCID_SELECT   ] = FnSelectRecvSelectReq,
-      [ MVFS_FUNCID_VFSREADY ] = FnSelectRecvVfsReadyNtc  };
+    { [ MVFS_FUNCID_MOUNT    ] = FnTaskRecvMountReq,
+      [ MVFS_FUNCID_OPEN     ] = FnMainRecvOpenReq,
+      [ MVFS_FUNCID_VFSOPEN  ] = FnMainRecvVfsOpenResp,
+      [ MVFS_FUNCID_WRITE    ] = FnMainRecvWriteReq,
+      [ MVFS_FUNCID_VFSWRITE ] = FnMainRecvVfsWriteResp,
+      [ MVFS_FUNCID_READ     ] = FnMainRecvReadReq,
+      [ MVFS_FUNCID_VFSREAD  ] = FnMainRecvVfsReadResp,
+      [ MVFS_FUNCID_CLOSE    ] = FnMainRecvCloseReq,
+      [ MVFS_FUNCID_VFSCLOSE ] = FnMainRecvVfsCloseResp,
+      [ MVFS_FUNCID_SELECT   ] = FnTaskRecvSelectReq,
+      [ MVFS_FUNCID_VFSREADY ] = FnTaskRecvVfsReadyNtc   };
 
 
 /******************************************************************************/
@@ -73,7 +74,7 @@ void main( void )
     MkErr_t err;    /* カーネルエラー     */
     MkRet_t ret;    /* カーネル関数戻り値 */
 
-    DEBUG_LOG_TRC( "start" );
+    DEBUG_LOG_TRC( "start." );
 
     /* 初期化 */
     err = MK_ERR_NONE;
@@ -91,7 +92,12 @@ void main( void )
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkTaskNameRegister(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkTaskNameRegister(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
         DEBUG_ABORT();
     }
 
@@ -119,8 +125,6 @@ static void Loop( void )
     MkTaskId_t   srcTaskId;     /* 送信元タスクID     */
     MvfsMsgHdr_t *pMsgHdr;      /* メッセージバッファ */
 
-    DEBUG_LOG_FNC( "%s(): start.", __func__ );
-
     /* 初期化 */
     ret       = MK_RET_FAILURE;
     err       = MK_ERR_NONE;
@@ -132,11 +136,9 @@ static void Loop( void )
     /* 割当て結果判定 */
     if ( pMsgHdr == NULL ) {
         /* 失敗 */
-        DEBUG_LOG_ERR( "malloc()" );
+        DEBUG_LOG_ERR( "%s(): malloc(): size=%u", __func__, MK_MSG_SIZE_MAX );
         DEBUG_ABORT();
     }
-
-    DEBUG_LOG_TRC( "loop start!" );
 
     /* メインループ */
     while ( true ) {
@@ -151,19 +153,41 @@ static void Loop( void )
         /* メッセージ受信結果判定 */
         if ( ret != MK_RET_SUCCESS ) {
             /* 失敗 */
-            DEBUG_LOG_ERR( "LibMkMsgReceive(): ret=%d, err=0x%X", ret, err );
+            DEBUG_LOG_ERR(
+                "%s(): LibMkMsgReceive(): ret=%d, err=%#X",
+                __func__,
+                ret,
+                err
+            );
+            continue;
+        }
+
+        /* ヘッダサイズチェック */
+        if ( size < sizeof ( MvfsMsgHdr_t ) ) {
+            /* 不正 */
+            DEBUG_LOG_ERR(
+                "%s(): invalid size( %u < %u ).",
+                __func__,
+                size,
+                sizeof ( MvfsMsgHdr_t )
+            );
             continue;
         }
 
         /* 機能ID範囲チェック */
         if ( pMsgHdr->funcId > MVFS_FUNCID_MAX ) {
             /* 範囲外 */
-            DEBUG_LOG_ERR( "invalid funcId: 0x%X", pMsgHdr->funcId );
+            DEBUG_LOG_ERR(
+                "%s(): invalid funcId( %#X > %#X ).",
+                __func__,
+                pMsgHdr->funcId,
+                MVFS_FUNCID_MAX
+            );
             continue;
         }
 
         /* 機能ID呼出し */
-        ( gFuncTbl[ pMsgHdr->funcId ] )( srcTaskId, pMsgHdr );
+        ( gFuncTbl[ pMsgHdr->funcId ] )( srcTaskId, pMsgHdr, size );
     }
 }
 

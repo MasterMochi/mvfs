@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/07/28 */
+/*                                                                 2019/10/01 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -304,7 +304,7 @@ static void ProcVfsOpenReq( LibMvfsSchedInfo_t  *pInfo,
         /* 設定無し */
 
         /* vfsOpen応答送信 */
-        LibMvfsSendVfsOpenResp( MVFS_RESULT_SUCCESS, NULL );
+        LibMvfsSendVfsOpenResp( pMsg->globalFd, MVFS_RESULT_SUCCESS, NULL );
     }
 
     return;

@@ -49,7 +49,7 @@
 #else
     /** デバッグログ出力(エラー) */
     #define DEBUG_LOG_ERR( _FORMAT, ... )            \
-        LibMlogPut( "[ERR][mvfs][%s:%u] " _FORMAT,   \
+        LibMlogPut( "[ERR ][mvfs][%s:%u] " _FORMAT,  \
                     __FILE__,                        \
                     __LINE__,                        \
                     ##__VA_ARGS__                  )
@@ -61,19 +61,19 @@
 #else
     /** デバッグログ出力(トレース) */
     #define DEBUG_LOG_TRC( _FORMAT, ... )            \
-        LibMlogPut( "[TRC][mvfs][%s:%u] " _FORMAT,   \
+        LibMlogPut( "[TRC ][mvfs][%s:%u] " _FORMAT,  \
                     __FILE__,                        \
                     __LINE__,                        \
                     ##__VA_ARGS__                  )
 #endif
 
-/* デバッグログ出力(関数トレース) */
+/* デバッグログ出力(テストトレース) */
 #if ( DEBUG_LOG_LV < 4 )
-    #define DEBUG_LOG_FNC( _FORMAT, ... )
+    #define DEBUG_LOG_TEST( _FORMAT, ... )
 #else
     /** デバッグログ出力(関数トレース) */
-    #define DEBUG_LOG_FNC( _FORMAT, ... )            \
-        LibMlogPut( "[FNC][mvfs][%s:%u] " _FORMAT,   \
+    #define DEBUG_LOG_TEST( _FORMAT, ... )           \
+        LibMlogPut( "[TEST][mvfs][%s:%u] " _FORMAT,  \
                     __FILE__,                        \
                     __LINE__,                        \
                     ##__VA_ARGS__                  )

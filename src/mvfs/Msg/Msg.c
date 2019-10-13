@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Msg/Msg.c                                                         */
-/*                                                                 2019/09/18 */
+/*                                                                 2019/10/12 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -21,12 +21,1109 @@
 /* 外部モジュールヘッダ */
 #include <mvfs.h>
 #include <Debug.h>
+#include <Fd.h>
 #include <Msg.h>
+#include <Node.h>
 
 
 /******************************************************************************/
 /* 外部モジュール向けグローバル関数定義                                       */
 /******************************************************************************/
+/******************************************************************************/
+/**
+ * @brief       Close要求メッセージチェック
+ * @details     Close要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckCloseReq( MkTaskId_t        taskId,
+                            MvfsMsgCloseReq_t *pMsg,
+                            size_t            size,
+                            FdInfo_t          **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgCloseReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgCloseReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId                ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->taskId )    ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->taskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s)",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       Mount要求メッセージチェック
+ * @details     Mount要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   *pMsg メッセージ
+ * @param[in]   size  メッセージサイズ
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckMountReq( MvfsMsgMountReq_t *pMsg,
+                            size_t            size   )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgMountReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgMountReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 絶対パス判定 */
+    if ( pMsg->path[ 0 ] != '/' ) {
+        /* 絶対パスではない */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid path( %s ).",
+            __func__,
+            pMsg->path
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC( "%s(): OK. path=%s", __func__, pMsg->path );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       Open要求メッセージチェック
+ * @details     Open要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   *pMsg メッセージ
+ * @param[in]   size  メッセージサイズ
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckOpenReq( MvfsMsgOpenReq_t *pMsg,
+                           size_t           size   )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgOpenReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgOpenReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. localFd=%u, path=%s",
+        __func__,
+        pMsg->localFd,
+        pMsg->path
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       Read要求メッセージチェック
+ * @details     Read要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckReadReq( MkTaskId_t       taskId,
+                           MvfsMsgReadReq_t *pMsg,
+                           size_t           size,
+                           FdInfo_t         **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgReadReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgReadReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->taskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->taskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), readIdx=%#X, size=%u",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        ( uint32_t ) pMsg->readIdx,
+        pMsg->size
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       Select要求メッセージチェック
+ * @details     Select要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckSelectReq( MkTaskId_t         taskId,
+                             MvfsMsgSelectReq_t *pMsg,
+                             size_t             size    )
+{
+    size_t   fdNum;     /* FDリストサイズ */
+    uint32_t idx;       /* インデックス   */
+    FdInfo_t *pFdInfo;  /* FD情報         */
+
+    /* 初期化 */
+    fdNum   = 0;
+    idx     = 0;
+    pFdInfo = NULL;
+
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgSelectReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgSelectReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FDリストサイズ計算 */
+    fdNum = pMsg->readFdNum + pMsg->writeFdNum;
+
+    /* オーバーフローチェック */
+    if ( ( fdNum < pMsg->readFdNum  ) ||
+         ( fdNum < pMsg->writeFdNum )    ) {
+        /* オーバーフロー */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid FdNum( %u = %u + %u ).",
+            __func__,
+            fdNum,
+            pMsg->readFdNum,
+            pMsg->writeFdNum
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FDリストサイズチェック */
+    if ( size < ( sizeof ( MvfsMsgSelectReq_t ) +
+                  sizeof ( uint32_t ) * fdNum     ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgSelectReq_t ) + sizeof ( uint32_t ) * fdNum
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 読込監視グローバルFD毎に繰り返す */
+    for ( idx = 0; idx < pMsg->readFdNum; idx++ ) {
+        /* FD情報取得 */
+        pFdInfo = FdGet( pMsg->fd[ idx ] );
+
+        /* 取得結果判定 */
+        if ( pFdInfo == NULL ) {
+            /* 失敗 */
+
+            DEBUG_LOG_ERR(
+                "%s(): invalid FD( %u ). idx=%u",
+                __func__,
+                pMsg->fd[ idx ],
+                idx
+            );
+            return MVFS_RET_FAILURE;
+        }
+
+        /* Openチェック */
+        if ( MK_TASKID_TO_PID( pFdInfo->taskId ) !=
+             MK_TASKID_TO_PID( taskId          )    ) {
+            /* 非Open */
+
+            DEBUG_LOG_ERR(
+                "%s(): invalid PID( %#X != %#X ). globalFd=%u",
+                __func__,
+                MK_TASKID_TO_PID( pFdInfo->taskId ),
+                MK_TASKID_TO_PID( taskId          ),
+                pMsg->fd[ idx ]
+            );
+            return MVFS_RET_FAILURE;
+        }
+    }
+
+    /* 書込監視グローバルFD毎に繰り返す */
+    for ( idx = 0; idx < pMsg->writeFdNum; idx++ ) {
+        /* FD情報取得 */
+        pFdInfo = FdGet( pMsg->fd[ pMsg->readFdNum + idx ] );
+
+        /* 取得結果判定 */
+        if ( pFdInfo == NULL ) {
+            /* 失敗 */
+
+            DEBUG_LOG_ERR(
+                "%s(): invalid FD( %u ). idx=%u",
+                __func__,
+                pMsg->fd[ pMsg->readFdNum + idx ],
+                pMsg->readFdNum + idx
+            );
+            return MVFS_RET_FAILURE;
+        }
+
+        /* Openチェック */
+        if ( MK_TASKID_TO_PID( pFdInfo->taskId ) !=
+             MK_TASKID_TO_PID( taskId          )    ) {
+            /* 非Open */
+
+            DEBUG_LOG_ERR(
+                "%s(): invalid PID( %#X != %#X ). globalFd=%u",
+                __func__,
+                MK_TASKID_TO_PID( pFdInfo->taskId ),
+                MK_TASKID_TO_PID( taskId          ),
+                pMsg->fd[ pMsg->readFdNum + idx ]
+            );
+            return MVFS_RET_FAILURE;
+        }
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. readFdNum=%u, writeFdNum=%u",
+        __func__,
+        pMsg->readFdNum,
+        pMsg->writeFdNum
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       VfsClose応答メッセージチェック
+ * @details     VfsClose応答メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckVfsCloseResp( MkTaskId_t            taskId,
+                                MvfsMsgVfsCloseResp_t *pMsg,
+                                size_t                size,
+                                FdInfo_t              **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsCloseResp_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsCloseResp_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_RESP
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 処理結果チェック */
+    if ( ( pMsg->result != MVFS_RESULT_SUCCESS ) &&
+         ( pMsg->result != MVFS_RESULT_FAILURE )    ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid result( %#X ).",
+            __func__,
+            pMsg->result
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                            ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), result=%#X",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        pMsg->result
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       VfsOpen応答メッセージチェック
+ * @details     VfsOpen応答メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckVfsOpenResp( MkTaskId_t           taskId,
+                               MvfsMsgVfsOpenResp_t *pMsg,
+                               size_t               size,
+                               FdInfo_t             **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsOpenResp_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsOpenResp_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_RESP ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_RESP
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 処理結果チェック */
+    if ( ( pMsg->result != MVFS_RESULT_SUCCESS ) &&
+         ( pMsg->result != MVFS_RESULT_FAILURE )    ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid result( %#X ).",
+            __func__,
+            pMsg->result
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                            ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), result=%#X",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        pMsg->result
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       VfsRead応答メッセージチェック
+ * @details     VfsRead応答メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckVfsReadResp( MkTaskId_t           taskId,
+                               MvfsMsgVfsReadResp_t *pMsg,
+                               size_t               size,
+                               FdInfo_t             **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsReadResp_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsReadResp_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* バッファサイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsReadResp_t ) + pMsg->size ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsReadResp_t ) + pMsg->size
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_RESP ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_RESP
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 処理結果チェック */
+    if ( ( pMsg->result != MVFS_RESULT_SUCCESS ) &&
+         ( pMsg->result != MVFS_RESULT_FAILURE )    ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid result( %#X ).",
+            __func__,
+            pMsg->result
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                            ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), result=%#X, ready=%#X, size=%u",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        pMsg->result,
+        pMsg->ready,
+        pMsg->size
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       VfsReady通知メッセージチェック
+ * @details     VfsReady通知メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId   メッセージ送信元タスクID
+ * @param[in]   *pMsg    メッセージ
+ * @param[in]   size     メッセージサイズ
+ * @param[out]  **ppNode ノード情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckVfsReadyNtc( MkTaskId_t           taskId,
+                               MvfsMsgVfsReadyNtc_t *pMsg,
+                               size_t               size,
+                               NodeInfo_t           **ppNode )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsReadyNtc_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsReadyNtc_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_NTC ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_NTC
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* レディ状態チェック */
+    if ( ( pMsg->ready & ~( MVFS_READY_READ | MVFS_READY_WRITE ) ) != 0 ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid ready( %#X ).",
+            __func__,
+            pMsg->ready
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* ノード取得 */
+    *ppNode = NodeGet( pMsg->path );
+
+    /* 取得結果判定 */
+    if ( *ppNode == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid path( %s ).",
+            __func__,
+            pMsg->path
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* ファイルタイプ判定 */
+    if ( ( *ppNode )->type != NODE_TYPE_MOUNT_FILE ) {
+        /* 非マウントファイル */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X ). path=%s",
+            __func__,
+            ( *ppNode )->type,
+            pMsg->path
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセス判定 */
+    if ( MK_TASKID_TO_PID( taskId                   ) !=
+         MK_TASKID_TO_PID( ( *ppNode )->mountTaskId )    ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). path=%s",
+            __func__,
+            MK_TASKID_TO_PID( taskId                   ),
+            MK_TASKID_TO_PID( ( *ppNode )->mountTaskId ),
+            pMsg->path
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. path=%s, ready=%#X",
+        __func__,
+        pMsg->path,
+        pMsg->ready
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       VfsWrite応答メッセージチェック
+ * @details     VfsWrite応答メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckVfsWriteResp( MkTaskId_t            taskId,
+                                MvfsMsgVfsWriteResp_t *pMsg,
+                                size_t                size,
+                                FdInfo_t              **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgVfsWriteResp_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgVfsWriteResp_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_RESP ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_RESP
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* 処理結果チェック */
+    if ( ( pMsg->result != MVFS_RESULT_SUCCESS ) &&
+         ( pMsg->result != MVFS_RESULT_FAILURE )    ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid result( %#X ).",
+            __func__,
+            pMsg->result
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                            ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->pNode->mountTaskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), result=%#X, ready=%#X, size=%u",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        pMsg->result,
+        pMsg->ready,
+        pMsg->size
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       Write要求メッセージチェック
+ * @details     Write要求メッセージの正当性をチェックする。
+ *
+ * @param[in]   taskId     メッセージ送信元タスクID
+ * @param[in]   *pMsg      メッセージ
+ * @param[in]   size       メッセージサイズ
+ * @param[out]  **ppFdInfo FD情報
+ *
+ * @return      チェック結果を返す。
+ * @retval      MVFS_RET_SUCCESS 正常
+ * @retval      MVFS_RET_FAILURE 不正
+ */
+/******************************************************************************/
+MvfsRet_t MsgCheckWriteReq( MkTaskId_t        taskId,
+                            MvfsMsgWriteReq_t *pMsg,
+                            size_t            size,
+                            FdInfo_t          **ppFdInfo )
+{
+    /* サイズチェック */
+    if ( size < sizeof ( MvfsMsgWriteReq_t ) ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgWriteReq_t )
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* バッファサイズチェック */
+    if ( size < sizeof ( MvfsMsgWriteResp_t ) + pMsg->size ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid size( %u < %u ).",
+            __func__,
+            size,
+            sizeof ( MvfsMsgWriteResp_t ) + pMsg->size
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* タイプチェック */
+    if ( pMsg->header.type != MVFS_TYPE_REQ ) {
+        /* 不正 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid type( %#X != %#X ).",
+            __func__,
+            pMsg->header.type,
+            MVFS_TYPE_REQ
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* FD情報取得 */
+    *ppFdInfo = FdGet( pMsg->globalFd );
+
+    /* 取得結果判定 */
+    if ( *ppFdInfo == NULL ) {
+        /* 失敗 */
+
+        DEBUG_LOG_ERR(
+            "%s(): FdGet() error. ret=%#p, globalFd=%u",
+            __func__,
+            *ppFdInfo,
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    /* プロセスID比較 */
+    if ( MK_TASKID_TO_PID( taskId ) !=
+         MK_TASKID_TO_PID( ( *ppFdInfo )->taskId ) ) {
+        /* 不一致 */
+
+        DEBUG_LOG_ERR(
+            "%s(): invalid pid( %#X != %#X ). globalFd=%u",
+            __func__,
+            MK_TASKID_TO_PID( taskId                ),
+            MK_TASKID_TO_PID( ( *ppFdInfo )->taskId ),
+            pMsg->globalFd
+        );
+        return MVFS_RET_FAILURE;
+    }
+
+    DEBUG_LOG_TRC(
+        "%s(): OK. globalFd=%u(%s), writeIdx=%#X, size=%u",
+        __func__,
+        pMsg->globalFd,
+        ( *ppFdInfo )->pNode->path,
+        ( uint32_t ) pMsg->writeIdx,
+        pMsg->size
+    );
+
+    return MVFS_RET_SUCCESS;
+}
+
+
 /******************************************************************************/
 /**
  * @brief       Close応答メッセージ送信
@@ -50,7 +1147,12 @@ void MsgSendCloseResp( MkTaskId_t dst,
     err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( msg ) );
 
-    DEBUG_LOG_TRC( "%s(): start. dst=0x%X, result=%d", __func__, dst, result );
+    DEBUG_LOG_TRC(
+        "%s(): dst=%#X, result=%#X",
+        __func__,
+        dst,
+        result
+    );
 
     /* メッセージ設定 */
     msg.header.funcId = MVFS_FUNCID_CLOSE;
@@ -64,10 +1166,14 @@ void MsgSendCloseResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -96,12 +1202,17 @@ void MsgSendMountResp( MkTaskId_t dst,
     err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgMountResp_t ) );
 
+    DEBUG_LOG_TRC(
+        "%s(): start. dst=%#X, result=%#X",
+        __func__,
+        dst,
+        result
+    );
+
     /* メッセージ設定 */
     msg.header.funcId = MVFS_FUNCID_MOUNT;
     msg.header.type   = MVFS_TYPE_RESP;
     msg.result        = result;
-
-    DEBUG_LOG_TRC( "%s(): start. dst=0x%X, result=%d", __func__, dst, result );
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgMountResp_t ), &err );
@@ -110,10 +1221,14 @@ void MsgSendMountResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -143,19 +1258,19 @@ void MsgSendOpenResp( MkTaskId_t dst,
     err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgOpenResp_t ) );
 
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_OPEN;
-    msg.header.type   = MVFS_TYPE_RESP;
-    msg.result        = result;
-    msg.globalFd      = globalFd;
-
     DEBUG_LOG_TRC(
-        "%s(): dst=0x%X, result=%d, globalFd=%u",
+        "%s(): dst=%#X, result=%#X, globalFd=%u",
         __func__,
         dst,
         result,
         globalFd
     );
+
+    /* メッセージ設定 */
+    msg.header.funcId = MVFS_FUNCID_OPEN;
+    msg.header.type   = MVFS_TYPE_RESP;
+    msg.result        = result;
+    msg.globalFd      = globalFd;
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgOpenResp_t ), &err );
@@ -164,10 +1279,14 @@ void MsgSendOpenResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -199,7 +1318,7 @@ void MsgSendReadResp( MkTaskId_t dst,
     err = MK_ERR_NONE;
 
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, result=%d, size=%u",
+        "%s(): dst=%#X, result=%#X, size=%u",
         __func__,
         dst,
         result,
@@ -213,8 +1332,11 @@ void MsgSendReadResp( MkTaskId_t dst,
     if ( pMsg == NULL ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "malloc(): %u", sizeof ( MvfsMsgReadResp_t ) + size );
-        DEBUG_LOG_FNC( "%s(): end.", __func__ );
+        DEBUG_LOG_ERR(
+            "%s(): malloc(): size=%u",
+            __func__,
+            sizeof ( MvfsMsgReadResp_t ) + size
+        );
         return;
     }
 
@@ -242,13 +1364,17 @@ void MsgSendReadResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
     /* バッファ解放 */
     free( pMsg );
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -287,7 +1413,7 @@ void MsgSendSelectResp( MkTaskId_t dst,
     err  = MK_ERR_NONE;
 
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, result=%d, readFdNum=%u, writeFdNum=%u",
+        "%s(): dst=%#X, result=%#X, readFdNum=%u, writeFdNum=%u",
         __func__,
         dst,
         result,
@@ -301,8 +1427,8 @@ void MsgSendSelectResp( MkTaskId_t dst,
     /* 確保結果判定 */
     if ( pMsg == NULL ) {
         /* 失敗 */
-        DEBUG_LOG_ERR( "malloc(): %u", size );
-        DEBUG_LOG_FNC( "%s():end.", __func__ );
+
+        DEBUG_LOG_ERR( "%s(): malloc(): size=%u", __func__, size );
         return;
     }
 
@@ -330,13 +1456,17 @@ void MsgSendSelectResp( MkTaskId_t dst,
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
     /* バッファ解放 */
     free( pMsg );
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -363,7 +1493,7 @@ void MsgSendVfsCloseReq( MkTaskId_t dst,
     memset( &msg, 0, sizeof ( MvfsMsgVfsCloseReq_t ) );
 
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, globalFd=%u",
+        "%s(): dst=%#X, globalFd=%u",
         __func__,
         dst,
         globalFd
@@ -381,10 +1511,14 @@ void MsgSendVfsCloseReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -414,21 +1548,21 @@ void MsgSendVfsOpenReq( MkTaskId_t dst,
     err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgVfsOpenReq_t ) );
 
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_VFSOPEN;
-    msg.header.type   = MVFS_TYPE_REQ;
-    msg.pid           = pid;
-    msg.globalFd      = globalFd;
-    strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
-
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, pid=%u, globalFd=%u, pPath=%s",
+        "%s(): dst=%#X, pid=%#X, globalFd=%u, pPath=%s",
         __func__,
         dst,
         pid,
         globalFd,
         pPath
     );
+
+    /* メッセージ設定 */
+    msg.header.funcId = MVFS_FUNCID_VFSOPEN;
+    msg.header.type   = MVFS_TYPE_REQ;
+    msg.pid           = pid;
+    msg.globalFd      = globalFd;
+    strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsOpenReq_t ), &err );
@@ -437,10 +1571,14 @@ void MsgSendVfsOpenReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -470,21 +1608,21 @@ void MsgSendVfsReadReq( MkTaskId_t dst,
     err = MK_ERR_NONE;
     memset( &msg, 0, sizeof ( MvfsMsgVfsReadReq_t ) );
 
-    /* メッセージ設定 */
-    msg.header.funcId = MVFS_FUNCID_VFSREAD;
-    msg.header.type   = MVFS_TYPE_REQ;
-    msg.globalFd      = globalFd;
-    msg.readIdx       = readIdx;
-    msg.size          = size;
-
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, globalFd=%u, readIdx=0x%X, size=%u",
+        "%s(): dst=%#X, globalFd=%u, readIdx=%#X, size=%u",
         __func__,
         dst,
         globalFd,
         ( uint32_t ) readIdx,
         size
     );
+
+    /* メッセージ設定 */
+    msg.header.funcId = MVFS_FUNCID_VFSREAD;
+    msg.header.type   = MVFS_TYPE_REQ;
+    msg.globalFd      = globalFd;
+    msg.readIdx       = readIdx;
+    msg.size          = size;
 
     /* メッセージ送信 */
     ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsReadReq_t ), &err );
@@ -493,10 +1631,14 @@ void MsgSendVfsReadReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -530,7 +1672,7 @@ void MsgSendVfsWriteReq( MkTaskId_t dst,
     pMsg = ( MvfsMsgVfsWriteReq_t * ) buffer;
 
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, globalFd=%u, writeIdx=0x%X, size=%u",
+        "%s(): dst=%#X, globalFd=%u, writeIdx=%#X, size=%u",
         __func__,
         dst,
         globalFd,
@@ -545,8 +1687,11 @@ void MsgSendVfsWriteReq( MkTaskId_t dst,
     if ( pMsg == NULL ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "malloc(): %u", sizeof ( MvfsMsgVfsWriteReq_t ) + size );
-        DEBUG_LOG_FNC( "%s(): end.", __func__ );
+        DEBUG_LOG_ERR(
+            "%s(): malloc(): size=%u",
+            __func__,
+            sizeof ( MvfsMsgVfsWriteReq_t ) + size
+        );
         return;
     }
 
@@ -571,13 +1716,17 @@ void MsgSendVfsWriteReq( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
     /* バッファ解放 */
     free( pMsg );
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
@@ -608,7 +1757,7 @@ void MsgSendWriteResp( MkTaskId_t dst,
     memset( &msg, 0, sizeof ( MvfsMsgWriteResp_t ) );
 
     DEBUG_LOG_TRC(
-        "%s(): start. dst=0x%X, result=%d, size=%u",
+        "%s(): dst=%#X, result=%d, size=%u",
         __func__,
         dst,
         result,
@@ -628,10 +1777,14 @@ void MsgSendWriteResp( MkTaskId_t dst,
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
-        DEBUG_LOG_ERR( "LibMkMsgSend(): ret=%d, err=0x%X", ret, err );
+        DEBUG_LOG_ERR(
+            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            __func__,
+            ret,
+            err
+        );
     }
 
-    DEBUG_LOG_FNC( "%s(): end.", __func__ );
     return;
 }
 
