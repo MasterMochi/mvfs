@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Msg/Msg.c                                                         */
-/*                                                                 2019/10/12 */
+/*                                                                 2019/11/22 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -1160,14 +1160,14 @@ void MsgSendCloseResp( MkTaskId_t dst,
     msg.result        = result;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( msg ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( msg ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1215,14 +1215,14 @@ void MsgSendMountResp( MkTaskId_t dst,
     msg.result        = result;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgMountResp_t ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( MvfsMsgMountResp_t ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1273,14 +1273,14 @@ void MsgSendOpenResp( MkTaskId_t dst,
     msg.globalFd      = globalFd;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgOpenResp_t ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( MvfsMsgOpenResp_t ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1358,14 +1358,17 @@ void MsgSendReadResp( MkTaskId_t dst,
     }
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, pMsg, sizeof ( MvfsMsgReadResp_t ) + size, &err );
+    ret = LibMkMsgSendNB( dst,
+                          pMsg,
+                          sizeof ( MvfsMsgReadResp_t ) + size,
+                          &err                                 );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1451,13 +1454,13 @@ void MsgSendSelectResp( MkTaskId_t dst,
             sizeof ( uint32_t ) * writeFdNum );
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, pMsg, size, &err );
+    ret = LibMkMsgSendNB( dst, pMsg, size, &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1505,14 +1508,14 @@ void MsgSendVfsCloseReq( MkTaskId_t dst,
     msg.globalFd      = globalFd;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( msg ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( msg ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1565,14 +1568,14 @@ void MsgSendVfsOpenReq( MkTaskId_t dst,
     strncpy( msg.path, pPath, MVFS_PATH_MAXLEN );
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsOpenReq_t ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( MvfsMsgVfsOpenReq_t ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1625,14 +1628,14 @@ void MsgSendVfsReadReq( MkTaskId_t dst,
     msg.size          = size;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgVfsReadReq_t ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( MvfsMsgVfsReadReq_t ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1707,17 +1710,17 @@ void MsgSendVfsWriteReq( MkTaskId_t dst,
     memcpy( pMsg->pBuffer, pBuffer, size );
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst,
-                        pMsg,
-                        sizeof ( MvfsMsgVfsWriteReq_t ) + size,
-                        &err                                    );
+    ret = LibMkMsgSendNB( dst,
+                          pMsg,
+                          sizeof ( MvfsMsgVfsWriteReq_t ) + size,
+                          &err                                    );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err
@@ -1771,14 +1774,14 @@ void MsgSendWriteResp( MkTaskId_t dst,
     msg.size          = size;
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &err );
+    ret = LibMkMsgSendNB( dst, &msg, sizeof ( MvfsMsgWriteResp_t ), &err );
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): LibMkMsgSend(): ret=%d, err=%#X",
+            "%s(): LibMkMsgSendNB(): ret=%d, err=%#X",
             __func__,
             ret,
             err

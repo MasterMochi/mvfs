@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2019/10/01 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/04/30 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -134,12 +134,13 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
         }
 
         /* メッセージ受信 */
-        retLibMk = LibMkMsgReceive( MK_TASKID_NULL,        /* 受信タスクID   */
-                                    pBuffer,               /* バッファ       */
-                                    MK_MSG_SIZE_MAX,       /* バッファサイズ */
-                                    &src,                  /* 送信元タスクID */
-                                    &size,                 /* 受信サイズ     */
-                                    &err              );
+        retLibMk = LibMkMsgReceive( MK_TASKID_NULL,     /* 受信タスクID   */
+                                    pBuffer,            /* バッファ       */
+                                    MK_MSG_SIZE_MAX,    /* バッファサイズ */
+                                    &src,               /* 送信元タスクID */
+                                    &size,              /* 受信サイズ     */
+                                    0,                  /* タイムアウト値 */
+                                    &err             ); /* エラー要因     */
 
         /* 受信結果判定 */
         if ( retLibMk != MK_RET_SUCCESS ) {

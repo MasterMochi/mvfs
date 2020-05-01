@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2019/10/07 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/04/30 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 #ifndef __LIB_MVFS_H__
@@ -25,7 +25,7 @@
 #define LIBMVFS_RET_SUCCESS ( 0 )   /**< 正常終了 */
 #define LIBMVFS_RET_FAILURE ( 1 )   /**< 異常終了 */
 
-/* エラー番号 */
+/* エラー種別 */
 #define LIBMVFS_ERR_NONE       ( 0x00000000 )   /**< エラー無し               */
 #define LIBMVFS_ERR_PARAM      ( 0x00000001 )   /**< パラメータ不正           */
 #define LIBMVFS_ERR_NOT_FOUND  ( 0x00000002 )   /**< 仮想ファイルサーバ不明   */
@@ -33,6 +33,7 @@
 #define LIBMVFS_ERR_NO_MEMORY  ( 0x00000004 )   /**< メモリ不足               */
 #define LIBMVFS_ERR_SERVER     ( 0x00000005 )   /**< 仮想ファイルサーバエラー */
 #define LIBMVFS_ERR_INVALID_FD ( 0x00000006 )   /**< FD無効                   */
+#define LIBMVFS_ERR_TIMEOUT    ( 0x00000007 )   /**< タイムアウト             */
 #define LIBMVFS_ERR_OTHER      ( 0x0000FFFF )   /**< その他エラー             */
 
 /* レディフラグ */
@@ -41,6 +42,9 @@
 
 /** 処理結果 */
 typedef uint32_t LibMvfsRet_t;
+
+/** エラー種別 */
+typedef uint32_t LibMvfsErr_t;
 
 /** その他メッセージコールバック関数型 */
 typedef
@@ -143,6 +147,7 @@ extern LibMvfsRet_t LibMvfsRead( uint32_t fd,
 /* Select */
 extern LibMvfsRet_t LibMvfsSelect( LibMvfsFds_t *pReadFds,
                                    LibMvfsFds_t *pWriteFds,
+                                   uint32_t     timeout,
                                    uint32_t     *pErr       );
 /* スケジュール開始 */
 extern LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,

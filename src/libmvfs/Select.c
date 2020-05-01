@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Select.c                                                       */
-/*                                                                 2019/09/16 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/04/30 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -40,6 +40,7 @@ static size_t GetFdsNum( LibMvfsFds_t *pFds );
 static LibMvfsRet_t ReceiveSelectResp( MkTaskId_t   taskId,
                                        LibMvfsFds_t *pReadFds,
                                        LibMvfsFds_t *pWriteFds,
+                                       uint32_t     timeout,
                                        uint32_t     *pErr       );
 /* Select要求送信 */
 static LibMvfsRet_t SendSelectReq( MkTaskId_t   taskId,
@@ -60,6 +61,7 @@ static LibMvfsRet_t SendSelectReq( MkTaskId_t   taskId,
  * @param[in]   *pReadFds  読込監視ローカルFDビットリスト
  * @param[in]   *pWriteFds 書込監視ローカルFDビットリスト
  * @param[out]  *pReadyFds レディFDビットリスト
+ * @param[in]   timeout    タイムアウト時間[us]
  * @param[out]  *pErr      エラー
  *                  - LIBMVFS_ERR_NONE エラー無し
  *
@@ -70,6 +72,7 @@ static LibMvfsRet_t SendSelectReq( MkTaskId_t   taskId,
 /******************************************************************************/
 LibMvfsRet_t LibMvfsSelect( LibMvfsFds_t *pReadFds,
                             LibMvfsFds_t *pWriteFds,
+                            uint32_t     timeout,
                             uint32_t     *pErr       )
 {
     MkTaskId_t   taskId;    /* タスクID */
@@ -100,7 +103,7 @@ LibMvfsRet_t LibMvfsSelect( LibMvfsFds_t *pReadFds,
     }
 
     /* Select応答メッセージ受信 */
-    ret = ReceiveSelectResp( taskId, pReadFds, pWriteFds, pErr );
+    ret = ReceiveSelectResp( taskId, pReadFds, pWriteFds, timeout, pErr );
 
     /* 受信結果判定 */
     if ( ret != LIBMVFS_RET_SUCCESS ) {
@@ -264,10 +267,12 @@ static size_t GetFdsNum( LibMvfsFds_t *pFds )
  * @param[in]   taskId     仮想ファイルサーバタスクID
  * @param[out]  *pReadFds  読込レディFDビットリスト
  * @param[out]  *pWriteFds 書込レディFDビットリスト
+ * @param[int]  timeout    タイムアウト時間[us]
  * @param[out]  *pErr      エラー内容
  *                  - LIBMVFS_ERR_NONE      エラー無し
  *                  - LIBMVFS_ERR_NO_MEMORY メモリ不足
  *                  - LIBMVFS_ERR_NOT_RESP  応答無し
+ *                  - LIBMVFS_ERR_TIMEOUT   タイムアウト
  *                  - LIBMVFS_ERR_ERR_OTHER その他エラー
  *
  * @return      処理結果を返す。
@@ -278,6 +283,7 @@ static size_t GetFdsNum( LibMvfsFds_t *pFds )
 static LibMvfsRet_t ReceiveSelectResp( MkTaskId_t   taskId,
                                        LibMvfsFds_t *pReadFds,
                                        LibMvfsFds_t *pWriteFds,
+                                       uint32_t     timeout,
                                        uint32_t     *pErr       )
 {
     size_t              size;   /* 受信メッセージサイズ  */
@@ -302,12 +308,13 @@ static LibMvfsRet_t ReceiveSelectResp( MkTaskId_t   taskId,
     }
 
     /* メッセージ受信 */
-    retMk = LibMkMsgReceive( taskId,             /* 受信タスクID   */
-                             pMsg,               /* バッファ       */
-                             MK_MSG_SIZE_MAX,    /* バッファサイズ */
-                             NULL,               /* 送信元タスクID */
-                             &size,              /* 受信サイズ     */
-                             &errMk           );
+    retMk = LibMkMsgReceive( taskId,                /* 受信タスクID   */
+                             pMsg,                  /* バッファ       */
+                             MK_MSG_SIZE_MAX,       /* バッファサイズ */
+                             NULL,                  /* 送信元タスクID */
+                             &size,                 /* 受信サイズ     */
+                             timeout,               /* タイムアウト値 */
+                             &errMk           );    /* エラー要因     */
 
     /* 受信結果判定 */
     if ( retMk != MK_RET_SUCCESS ) {
@@ -321,6 +328,10 @@ static LibMvfsRet_t ReceiveSelectResp( MkTaskId_t   taskId,
         } else if ( errMk == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
             MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NO_MEMORY );
+
+        } else if ( errMk == MK_ERR_TIMEOUT ) {
+            /* タイムアウト */
+            MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_TIMEOUT );
 
         } else {
             /* その他エラー */
