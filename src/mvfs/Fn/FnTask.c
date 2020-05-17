@@ -76,6 +76,7 @@ static bool CompareTaskId( uint32_t idx,
 /* 状態遷移タスク */
 static MLibState_t DoTask0101( void *pArg );
 static MLibState_t DoTask0102( void *pArg );
+static MLibState_t DoTask0202( void *pArg );
 static MLibState_t DoTask0203( void *pArg );
 
 /* VfsReady通知イベント実行 */
@@ -97,9 +98,10 @@ static const MLibStateTransition_t gStt[] = {
     /* 状態               | イベント           | タスク     | { 遷移先状態                           } */
     /*--------------------+--------------------+------------+------------------------------------------*/
     { STATE_INIT          , EVENT_MOUNT_REQ    , DoTask0101 , { STATE_INIT                       , 0 } },
-    { STATE_INIT          , EVENT_VFSREADY_NTC , NULL       , { STATE_INIT                       , 0 } },
     { STATE_INIT          , EVENT_SELECT_REQ   , DoTask0102 , { STATE_INIT , STATE_VFSREADY_WAIT , 0 } },
-    { STATE_VFSREADY_WAIT , EVENT_VFSREADY_NTC , DoTask0203 , { STATE_INIT , STATE_VFSREADY_WAIT , 0 } } };
+    { STATE_INIT          , EVENT_VFSREADY_NTC , NULL       , { STATE_INIT                       , 0 } },
+    { STATE_VFSREADY_WAIT , EVENT_SELECT_REQ   , DoTask0202 , { STATE_INIT , STATE_VFSREADY_WAIT , 0 } },
+    { STATE_VFSREADY_WAIT , EVENT_VFSREADY_NTC , DoTask0203 , { STATE_INIT , STATE_VFSREADY_WAIT , 0 } }  };
     /*--------------------+--------------------+------------+------------------------------------------*/
 
 /** タスク単位管理テーブル */
@@ -743,6 +745,40 @@ static MLibState_t  DoTask0102( void *pArg )
     }
 
     return ret;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       状態遷移タスク0202
+ * @details     受付処理中のSelect要求を破棄し、新しいSelect要求を受け付ける。
+ *
+ * @param[in]   *pArg パラメータ
+ *
+ * @return      遷移先状態を返す。
+ * @retval      STATE_INIT          初期状態
+ * @retval      STATE_VFSREADY_WAIT VfsReady待ち状態
+ */
+/******************************************************************************/
+static MLibState_t DoTask0202( void *pArg )
+{
+    taskInfo_t  *pTaskInfo; /* タスク単位情報 */
+    taskParam_t *pParam;    /* パラメータ     */
+
+    /* 初期化 */
+    pParam    = ( taskParam_t * ) pArg;
+    pTaskInfo = ( taskInfo_t  * ) pParam->pTaskInfo;
+
+    /* 監視グローバルFDリスト解放 */
+    free( pTaskInfo->pReadFdList  );
+    free( pTaskInfo->pWriteFdList );
+    pTaskInfo->pReadFdList  = NULL;
+    pTaskInfo->pWriteFdList = NULL;
+    pTaskInfo->readFdNum    = 0;
+    pTaskInfo->writeFdNum   = 0;
+
+    /* Select要求処理 */
+    return DoTask0102( pArg );
 }
 
 

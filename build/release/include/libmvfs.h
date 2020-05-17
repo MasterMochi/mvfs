@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2020/04/30 */
+/*                                                                 2020/05/14 */
 /* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -73,8 +73,8 @@ typedef
     void
     ( *LibMvfsFuncVfsRead_t )
     ( uint32_t globalFd,    /* グローバルFD       */
-      uint64_t readIdx,     /* 書込みインデックス */
-      size_t   size      ); /* 書込みサイズ       */
+      uint64_t readIdx,     /* 読込みインデックス */
+      size_t   size      ); /* 読込みサイズ       */
 
 /** VfsWrite要求コールバック関数型 */
 typedef
@@ -106,14 +106,14 @@ typedef struct {
 #define LIBMVFS_FDS_BLOCK_SIZE ( 8 * sizeof ( uint32_t ) )
 
 /** FDビットリストチェック */
-#define LIBMVFS_FDS_CHECK( _PFDS, _FD )                                        \
-    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / ( LIBMVFS_FDS_BLOCK_SIZE ) ] &   \
-      ( 1 << ( ( _FD ) % LIBMVFS_FDS_BLOCK_SIZE ) )                          )
+#define LIBMVFS_FDS_CHECK( _PFDS, _FD )                                    \
+    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / LIBMVFS_FDS_BLOCK_SIZE ] &   \
+      ( 1 << ( ( _FD ) % LIBMVFS_FDS_BLOCK_SIZE ) )                      )
 
 /** FDビットリスト設定 */
-#define LIBMVFS_FDS_SET( _PFDS, _FD )                                         \
-    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / ( LIBMVFS_FDS_BLOCK_SIZE ) ] |= \
-      1 << ( ( _FD ) % ( LIBMVFS_FDS_BLOCK_SIZE ) ) )
+#define LIBMVFS_FDS_SET( _PFDS, _FD )                                       \
+    ( ( ( uint32_t * ) ( _PFDS ) )[ ( _FD ) / LIBMVFS_FDS_BLOCK_SIZE ] |=   \
+      ( 1 << ( ( _FD ) % LIBMVFS_FDS_BLOCK_SIZE ) )                       )
 
 /** FDビットリストサイズ */
 #define LIBMVFS_FDS_SIZE ( LIBMVFS_FD_MAXNUM / LIBMVFS_FDS_BLOCK_SIZE )
