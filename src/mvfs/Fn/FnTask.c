@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fn/FnTask.c                                                       */
-/*                                                                 2019/10/09 */
+/*                                                                 2020/05/25 */
 /* Copyright (C) 2019 Mochi.                                                  */
 /*                                                                            */
 /******************************************************************************/
@@ -693,14 +693,14 @@ static MLibState_t  DoTask0102( void *pArg )
     /* 書込監視グローバルFD毎に繰り返す */
     for ( idx = 0; idx < pMsg->writeFdNum; idx++ ) {
         /* FD情報取得 */
-        pFdInfo = FdGet( pMsg->readFdNum + pMsg->fd[ idx ] );
+        pFdInfo = FdGet( pMsg->fd[ pMsg->readFdNum + idx ] );
 
         /* 書込レディチェック */
         if ( ( pFdInfo->pNode->ready & MVFS_READY_WRITE ) != 0 ) {
             /* レディ */
 
             /* 書込レディグローバルFD設定 */
-            pWriteFdList[ writeFdNum++ ] = pMsg->readFdNum + pMsg->fd[ idx ];
+            pWriteFdList[ writeFdNum++ ] = pMsg->fd[ pMsg->readFdNum + idx ];
         }
     }
 
