@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Node/Node.c                                                       */
-/*                                                                 2020/05/28 */
+/*                                                                 2020/07/19 */
 /* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -241,20 +241,20 @@ void NodeDelete( NodeInfo_t *pNode )
 /******************************************************************************/
 NodeInfo_t *NodeGet( const char *pPath )
 {
-    char              *pName;       /* ファイル名         */
-    size_t            num;          /* パス分割数         */
-    uint32_t          i;            /* カウンタ           */
-    uint32_t          errNo;        /* エラー番号         */
-    MLibRet_t         retMLib;      /* MLib戻り値         */
-    NodeInfo_t        *pNode;       /* ノード    　       */
-    MLibSplitHandle_t *pHandle;     /* 文字列分割ハンドル */
+    char        *pName;     /* ファイル名         */
+    size_t      num;        /* パス分割数         */
+    uint32_t    i;          /* カウンタ           */
+    MLibErr_t   errMLib;    /* エラー要因         */
+    MLibRet_t   retMLib;    /* MLib戻り値         */
+    NodeInfo_t  *pNode;     /* ノード    　       */
+    MLibSplit_t *pHandle;   /* 文字列分割ハンドル */
 
     /* 初期化 */
     pName   = NULL;
     num     = 0;
     i       = 0;
-    errNo   = MLIB_SPLIT_ERR_NONE;
-    retMLib = MLIB_FAILURE;
+    errMLib = MLIB_ERR_NONE;
+    retMLib = MLIB_RET_FAILURE;
     pNode   = NULL;
     pHandle = NULL;
 
@@ -274,45 +274,45 @@ NodeInfo_t *NodeGet( const char *pPath )
                                         &pPath[ 1 ],
                                         strlen( pPath ),
                                         '/',
-                                        &errNo           );
+                                        &errMLib         );
 
     /* 分割結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
             "%s(): MLibSplitInitByDelimiter(): ret=%d, err=%#X, pPath=%s",
             __func__,
             retMLib,
-            errNo,
+            errMLib,
             pPath
         );
         return NULL;
     }
 
     /* 分割数取得 */
-    retMLib = MLibSplitGetNum( pHandle, &num, &errNo );
+    retMLib = MLibSplitGetNum( pHandle, &num, &errMLib );
 
     for ( i = 0; i < num; i++ ) {
         /* 文字列取得 */
-        MLibSplitGet( pHandle, i, &pName, &errNo );
+        MLibSplitGet( pHandle, i, &pName, &errMLib );
 
         /* 親ノードからノード取得 */
         pNode = GetInNode( pNode, pName );
     }
 
     /* 文字列分割ハンドル解放 */
-    retMLib = MLibSplitTerm( &pHandle, &errNo );
+    retMLib = MLibSplitTerm( &pHandle, &errMLib );
 
     /* 解放結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
             "%s(): MLibSplitTerm(): ret=%d, err=%#X",
             __func__,
             retMLib,
-            errNo
+            errMLib
         );
     }
 
@@ -392,7 +392,7 @@ static NodeList_t *CreateList( NodeInfo_t *pNode )
                                   ( MLibListNode_t * ) pList );
 
     /* 追加結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(

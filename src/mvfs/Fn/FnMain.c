@@ -62,14 +62,14 @@ static MvfsRet_t AllocFd( MkTaskId_t taskId,
                           const char *pPath,
                           FdInfo_t   **ppFdInfo );
 /* 状態遷移タスク */
-static MLibState_t Task0101( void *pArg );
-static MLibState_t Task0102( void *pArg );
-static MLibState_t Task0103( void *pArg );
-static MLibState_t Task0104( void *pArg );
-static MLibState_t Task0205( void *pArg );
-static MLibState_t Task0306( void *pArg );
-static MLibState_t Task0407( void *pArg );
-static MLibState_t Task0508( void *pArg );
+static MLibStateNo_t Task0101( void *pArg );
+static MLibStateNo_t Task0102( void *pArg );
+static MLibStateNo_t Task0103( void *pArg );
+static MLibStateNo_t Task0104( void *pArg );
+static MLibStateNo_t Task0205( void *pArg );
+static MLibStateNo_t Task0306( void *pArg );
+static MLibStateNo_t Task0407( void *pArg );
+static MLibStateNo_t Task0508( void *pArg );
 
 
 /******************************************************************************/
@@ -111,12 +111,12 @@ void FnMainRecvCloseReq( MkTaskId_t taskId,
                          size_t     size      )
 {
     FdInfo_t          *pFdInfo;     /* FD情報         */
-    uint32_t          errMLib;      /* MLIBエラー要因 */
+    MLibErr_t         errMLib;      /* MLIBエラー要因 */
     MLibRet_t         retMLib;      /* MLIB戻り値     */
     MvfsRet_t         retMvfs;      /* 戻り値         */
-    MLibState_t       prevState;    /* 遷移前状態     */
-    MLibState_t       nextState;    /* 遷移後状態     */
     taskParam_t       param;        /* パラメータ     */
+    MLibStateNo_t     prevState;    /* 遷移前状態     */
+    MLibStateNo_t     nextState;    /* 遷移後状態     */
     MvfsMsgCloseReq_t *pMsg;        /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -128,8 +128,8 @@ void FnMainRecvCloseReq( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -159,7 +159,7 @@ void FnMainRecvCloseReq( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -200,12 +200,12 @@ void FnMainRecvOpenReq( MkTaskId_t taskId,
                         size_t     size      )
 {
     FdInfo_t         *pFdInfo;  /* FD情報         */
-    uint32_t         errMLib;   /* MLIBエラー要因 */
+    MLibErr_t        errMLib;   /* MLIBエラー要因 */
     MLibRet_t        retMLib;   /* MLIB戻り値     */
     MvfsRet_t        retMvfs;   /* 戻り値         */
-    MLibState_t      prevState; /* 遷移前状態     */
-    MLibState_t      nextState; /* 遷移後状態     */
     taskParam_t      param;     /* パラメータ     */
+    MLibStateNo_t    prevState; /* 遷移前状態     */
+    MLibStateNo_t    nextState; /* 遷移後状態     */
     MvfsMsgOpenReq_t *pMsg;     /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -217,8 +217,8 @@ void FnMainRecvOpenReq( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -265,7 +265,7 @@ void FnMainRecvOpenReq( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -308,12 +308,12 @@ void FnMainRecvReadReq( MkTaskId_t taskId,
                         size_t     size      )
 {
     FdInfo_t         *pFdInfo;  /* FD情報         */
-    uint32_t         errMLib;   /* MLIBエラー要因 */
+    MLibErr_t        errMLib;   /* MLIBエラー要因 */
     MLibRet_t        retMLib;   /* MLIB戻り値     */
     MvfsRet_t        retMvfs;   /* 戻り値         */
-    MLibState_t      prevState; /* 遷移前状態     */
-    MLibState_t      nextState; /* 遷移後状態     */
     taskParam_t      param;     /* パラメータ     */
+    MLibStateNo_t    prevState; /* 遷移前状態     */
+    MLibStateNo_t    nextState; /* 遷移後状態     */
     MvfsMsgReadReq_t *pMsg;     /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -325,8 +325,8 @@ void FnMainRecvReadReq( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -356,7 +356,7 @@ void FnMainRecvReadReq( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -399,12 +399,12 @@ void FnMainRecvVfsCloseResp( MkTaskId_t taskId,
                              size_t     size      )
 {
     FdInfo_t              *pFdInfo;     /* FD情報         */
-    uint32_t              errMLib;      /* MLIBエラー要因 */
+    MLibErr_t             errMLib;      /* MLIBエラー要因 */
     MLibRet_t             retMLib;      /* MLIB戻り値     */
     MvfsRet_t             retMvfs;      /* 戻り値         */
-    MLibState_t           prevState;    /* 遷移前状態     */
-    MLibState_t           nextState;    /* 遷移後状態     */
     taskParam_t           param;        /* パラメータ     */
+    MLibStateNo_t         prevState;    /* 遷移前状態     */
+    MLibStateNo_t         nextState;    /* 遷移後状態     */
     MvfsMsgVfsCloseResp_t *pMsg;        /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -416,8 +416,8 @@ void FnMainRecvVfsCloseResp( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -447,7 +447,7 @@ void FnMainRecvVfsCloseResp( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -486,12 +486,12 @@ void FnMainRecvVfsOpenResp( MkTaskId_t taskId,
                             size_t     size      )
 {
     FdInfo_t             *pFdInfo;  /* FD情報         */
-    uint32_t             errMLib;   /* MLIBエラー要因 */
+    MLibErr_t            errMLib;   /* MLIBエラー要因 */
     MLibRet_t            retMLib;   /* MLIB戻り値     */
     MvfsRet_t            retMvfs;   /* 戻り値         */
-    MLibState_t          prevState; /* 遷移前状態     */
-    MLibState_t          nextState; /* 遷移後状態     */
     taskParam_t          param;     /* パラメータ     */
+    MLibStateNo_t        prevState; /* 遷移前状態     */
+    MLibStateNo_t        nextState; /* 遷移後状態     */
     MvfsMsgVfsOpenResp_t *pMsg;     /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -503,8 +503,8 @@ void FnMainRecvVfsOpenResp( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -534,7 +534,7 @@ void FnMainRecvVfsOpenResp( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -573,12 +573,12 @@ void FnMainRecvVfsReadResp( MkTaskId_t taskId,
                             size_t     size      )
 {
     FdInfo_t             *pFdInfo;  /* FD情報         */
-    uint32_t             errMLib;   /* MLIBエラー要因 */
+    MLibErr_t            errMLib;   /* MLIBエラー要因 */
     MLibRet_t            retMLib;   /* MLIB戻り値     */
     MvfsRet_t            retMvfs;   /* 戻り値         */
-    MLibState_t          prevState; /* 遷移前状態     */
-    MLibState_t          nextState; /* 遷移後状態     */
     taskParam_t          param;     /* パラメータ     */
+    MLibStateNo_t        prevState; /* 遷移前状態     */
+    MLibStateNo_t        nextState; /* 遷移後状態     */
     MvfsMsgVfsReadResp_t *pMsg;     /* メッセージ     */
 
     DEBUG_LOG_TRC(
@@ -590,8 +590,8 @@ void FnMainRecvVfsReadResp( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -621,7 +621,7 @@ void FnMainRecvVfsReadResp( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -660,11 +660,11 @@ void FnMainRecvVfsWriteResp( MkTaskId_t taskId,
                              size_t     size      )
 {
     FdInfo_t              *pFdInfo;  /* FD情報         */
-    uint32_t              errMLib;   /* MLIBエラー要因 */
+    MLibErr_t             errMLib;   /* MLIBエラー要因 */
     MLibRet_t             retMLib;   /* MLIB戻り値     */
     MvfsRet_t             retMvfs;   /* 戻り値         */
-    MLibState_t           prevState; /* 遷移前状態     */
-    MLibState_t           nextState; /* 遷移後状態     */
+    MLibStateNo_t         prevState; /* 遷移前状態     */
+    MLibStateNo_t         nextState; /* 遷移後状態     */
     taskParam_t           param;     /* パラメータ     */
     MvfsMsgVfsWriteResp_t *pMsg;     /* メッセージ     */
 
@@ -677,8 +677,8 @@ void FnMainRecvVfsWriteResp( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -708,7 +708,7 @@ void FnMainRecvVfsWriteResp( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -747,11 +747,11 @@ void FnMainRecvWriteReq( MkTaskId_t taskId,
                          size_t     size      )
 {
     FdInfo_t          *pFdInfo;     /* FD情報         */
-    uint32_t          errMLib;      /* MLIBエラー要因 */
+    MLibErr_t         errMLib;      /* MLIBエラー要因 */
     MLibRet_t         retMLib;      /* MLIB戻り値     */
     MvfsRet_t         retMvfs;      /* 戻り値         */
-    MLibState_t       prevState;    /* 遷移前状態     */
-    MLibState_t       nextState;    /* 遷移後状態     */
+    MLibStateNo_t     prevState;    /* 遷移前状態     */
+    MLibStateNo_t     nextState;    /* 遷移後状態     */
     taskParam_t       param;        /* パラメータ     */
     MvfsMsgWriteReq_t *pMsg;        /* メッセージ     */
 
@@ -764,8 +764,8 @@ void FnMainRecvWriteReq( MkTaskId_t taskId,
 
     /* 初期化 */
     pFdInfo   = NULL;
-    errMLib   = MLIB_STATE_ERR_NONE;
-    retMLib   = MLIB_FAILURE;
+    errMLib   = MLIB_ERR_NONE;
+    retMLib   = MLIB_RET_FAILURE;
     retMvfs   = MVFS_RET_FAILURE;
     prevState = MLIB_STATE_NULL;
     nextState = MLIB_STATE_NULL;
@@ -795,7 +795,7 @@ void FnMainRecvWriteReq( MkTaskId_t taskId,
                              &errMLib                );
 
     /* 実行結果判定 */
-    if ( retMLib != MLIB_SUCCESS ) {
+    if ( retMLib != MLIB_RET_SUCCESS ) {
         /* 失敗 */
 
         DEBUG_LOG_ERR(
@@ -918,7 +918,7 @@ static MvfsRet_t AllocFd( MkTaskId_t taskId,
  * @retval      STATE_VFSOPEN_WAIT VfsOpen待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0101( void *pArg )
+static MLibStateNo_t Task0101( void *pArg )
 {
     FdInfo_t         *pFdInfo;  /* FD情報     */
     taskParam_t      *pParam;   /* パラメータ */
@@ -954,7 +954,7 @@ static MLibState_t Task0101( void *pArg )
  * @retval      STATE_VFSREAD_WAIT VfsRead待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0102( void *pArg )
+static MLibStateNo_t Task0102( void *pArg )
 {
     FdInfo_t         *pFdInfo;  /* FD情報     */
     taskParam_t      *pParam;   /* パラメータ */
@@ -990,7 +990,7 @@ static MLibState_t Task0102( void *pArg )
  * @retval      STATE_VFSWRITE_WAIT VfsWrite待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0103( void *pArg )
+static MLibStateNo_t Task0103( void *pArg )
 {
     FdInfo_t          *pFdInfo; /* FD情報     */
     taskParam_t       *pParam;  /* パラメータ */
@@ -1027,7 +1027,7 @@ static MLibState_t Task0103( void *pArg )
  * @retval      STATE_VFSCLOSE_WAIT VfsClose待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0104( void *pArg )
+static MLibStateNo_t Task0104( void *pArg )
 {
     FdInfo_t          *pFdInfo; /* FD情報     */
     taskParam_t       *pParam;  /* パラメータ */
@@ -1061,7 +1061,7 @@ static MLibState_t Task0104( void *pArg )
  * @retval      STATE_VFSOPEN_WAIT VfsOpen待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0205( void *pArg )
+static MLibStateNo_t Task0205( void *pArg )
 {
     FdInfo_t             *pFdInfo;  /* FD情報     */
     taskParam_t          *pParam;   /* パラメータ */
@@ -1093,7 +1093,7 @@ static MLibState_t Task0205( void *pArg )
  * @retval      STATE_VFSREAD_WAIT VfsRead待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0306( void *pArg )
+static MLibStateNo_t Task0306( void *pArg )
 {
     FdInfo_t             *pFdInfo;  /* FD情報     */
     taskParam_t          *pParam;   /* パラメータ */
@@ -1130,7 +1130,7 @@ static MLibState_t Task0306( void *pArg )
  * @retval      STATE_VFSWRITE_WAIT VfsWrite待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0407( void *pArg )
+static MLibStateNo_t Task0407( void *pArg )
 {
     FdInfo_t              *pFdInfo; /* FD情報     */
     taskParam_t           *pParam;  /* パラメータ */
@@ -1164,7 +1164,7 @@ static MLibState_t Task0407( void *pArg )
  * @retval      STATE_VFSCLOSE_WAIT VfsClose待ち状態
  */
 /******************************************************************************/
-static MLibState_t Task0508( void *pArg )
+static MLibStateNo_t Task0508( void *pArg )
 {
     FdInfo_t              *pFdInfo; /* FD情報     */
     taskParam_t           *pParam;  /* パラメータ */

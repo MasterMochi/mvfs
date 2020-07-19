@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/include/Fd.h                                                      */
-/*                                                                 2019/10/01 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/07/19 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 #ifndef FD_H
@@ -29,12 +29,12 @@
 /******************************************************************************/
 /** ファイルディスクリプタ情報 */
 typedef struct {
-    bool              used;     /**< 使用済みフラグ   */
-    uint32_t          globalFd; /**< グローバルFD     */
-    uint32_t          localFd;  /**< ローカルFD       */
-    MkTaskId_t        taskId;   /**< タスクID         */
-    NodeInfo_t        *pNode;   /**< ノード           */
-    MLibStateHandle_t stateHdl; /**< 状態遷移ハンドル */
+    bool        used;     /**< 使用済みフラグ   */
+    uint32_t    globalFd; /**< グローバルFD     */
+    uint32_t    localFd;  /**< ローカルFD       */
+    MkTaskId_t  taskId;   /**< タスクID         */
+    NodeInfo_t  *pNode;   /**< ノード           */
+    MLibState_t stateHdl; /**< 状態遷移ハンドル */
 } FdInfo_t;
 
 
