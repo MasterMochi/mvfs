@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Select.c                                                       */
-/*                                                                 2020/04/30 */
+/*                                                                 2020/07/25 */
 /* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -11,6 +11,7 @@
 /* 標準ヘッダ */
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* ライブラリヘッダ */
 #include <libmk.h>
@@ -197,6 +198,9 @@ static void ConvertListToFds( LibMvfsFds_t *pFds,
         /* 不正 */
         return;
     }
+
+    /* FDビットリスト初期化 */
+    memset( pFds, 0, sizeof ( LibMvfsFds_t ) );
 
     /* リストエントリ毎に繰り返す */
     for ( idx = 0; idx < fdNum; idx++ ) {

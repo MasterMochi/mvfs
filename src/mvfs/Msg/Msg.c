@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Msg/Msg.c                                                         */
-/*                                                                 2019/11/22 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/07/25 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -1442,6 +1442,8 @@ void MsgSendSelectResp( MkTaskId_t dst,
     pMsg->header.funcId = MVFS_FUNCID_READ;
     pMsg->header.type   = MVFS_TYPE_RESP;
     pMsg->result        = result;
+    pMsg->readFdNum     = readFdNum;
+    pMsg->writeFdNum    = writeFdNum;
 
     /* 読込レディグローバルFDリスト設定 */
     memcpy( &( pMsg->fd[ 0 ] ),

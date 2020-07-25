@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/include/Debug.h                                                   */
-/*                                                                 2019/09/18 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/07/25 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 #ifndef DEBUG_H
@@ -49,7 +49,7 @@
 #else
     /** デバッグログ出力(エラー) */
     #define DEBUG_LOG_ERR( _FORMAT, ... )            \
-        LibMlogPut( "[ERR ][mvfs][%s:%u] " _FORMAT,  \
+        LibMlogPut( "[ERR][mvfs][%s:%u] " _FORMAT,   \
                     __FILE__,                        \
                     __LINE__,                        \
                     ##__VA_ARGS__                  )
@@ -61,7 +61,7 @@
 #else
     /** デバッグログ出力(トレース) */
     #define DEBUG_LOG_TRC( _FORMAT, ... )            \
-        LibMlogPut( "[TRC ][mvfs][%s:%u] " _FORMAT,  \
+        LibMlogPut( "[TRC][mvfs][%s:%u] " _FORMAT,   \
                     __FILE__,                        \
                     __LINE__,                        \
                     ##__VA_ARGS__                  )
