@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Send.c                                                         */
-/*                                                                 2019/10/07 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2020/07/25 */
+/* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -686,10 +686,10 @@ static LibMvfsRet_t SendVfsReadyNtc( MkTaskId_t taskId,
     memcpy( &( msg.path ), pPath, MVFS_PATH_MAXLEN );
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( taskId,            /* 送信先タスクID   */
-                        &msg,              /* 送信メッセージ   */
-                        sizeof ( msg ),    /* 送信メッセージ長 */
-                        &err            ); /* エラー内容       */
+    ret = LibMkMsgSendNB( taskId,               /* 送信先タスクID   */
+                          &msg,                 /* 送信メッセージ   */
+                          sizeof ( msg ),       /* 送信メッセージ長 */
+                          &err            );    /* エラー内容       */
 
     /* 送信結果判定 */
     if ( ret != MK_RET_SUCCESS ) {

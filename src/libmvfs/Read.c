@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Read.c                                                         */
-/*                                                                 2020/04/30 */
+/*                                                                 2020/07/26 */
 /* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -197,12 +197,6 @@ LibMvfsRet_t LibMvfsRead( uint32_t  fd,
             return LIBMVFS_RET_FAILURE;
         }
 
-        /* 読込みサイズ判定 */
-        if ( pRespMsg->size == 0 ) {
-            /* EOF */
-            break;
-        }
-
         /* 読込みバッファコピー */
         memcpy( pBuffer, pRespMsg->pBuffer, pRespMsg->size );
 
@@ -213,6 +207,12 @@ LibMvfsRet_t LibMvfsRead( uint32_t  fd,
 
         /* 読込み実施サイズ設定 */
         MLIB_SET_IFNOT_NULL( pReadSize, *pReadSize + pRespMsg->size );
+
+        /* 再読み込み可能判定 */
+        if ( pRespMsg->size < MVFS_BUFFER_SIZE_MAX ) {
+            /* 不可 */
+            break;
+        }
     }
 
     /* メッセージバッファ解放 */
