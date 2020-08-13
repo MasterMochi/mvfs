@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Write.c                                                        */
-/*                                                                 2020/04/30 */
+/*                                                                 2020/08/13 */
 /* Copyright (C) 2019-2020 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ライブラリヘッダ */
@@ -306,20 +307,34 @@ static LibMvfsRet_t SendWriteReq( MkTaskId_t taskId,
                                   size_t     size,
                                   uint32_t   *pErrNo   )
 {
-    char              buffer[ MK_MSG_SIZE_MAX ];    /* メッセージバッファ */
-    size_t            msgSize;                      /* メッセージサイズ   */
-    MkRet_t           ret;                          /* カーネル戻り値     */
-    MkErr_t           err;                          /* カーネルエラー内容 */
-    MvfsMsgWriteReq_t *pMsg;                        /* 要求メッセージ     */
+    size_t            msgSize;  /* メッセージサイズ   */
+    MkRet_t           retMk;    /* カーネル戻り値     */
+    MkErr_t           errMk;    /* カーネルエラー内容 */
+    LibMvfsRet_t      ret;      /* 戻り値             */
+    MvfsMsgWriteReq_t *pMsg;    /* 要求メッセージ     */
 
     /* 初期化 */
     msgSize = sizeof ( MvfsMsgWriteReq_t ) + size;
-    ret     = MK_RET_FAILURE;
-    err     = MK_ERR_NONE;
-    pMsg    = ( MvfsMsgWriteReq_t * ) &buffer;
-    memset( buffer, 0, sizeof ( buffer ) );
+    retMk   = MK_RET_FAILURE;
+    errMk   = MK_ERR_NONE;
+    ret     = LIBMVFS_RET_SUCCESS;
+    pMsg    = NULL;
 
-    /* メッセージ作成 */
+    /* メッセージ割当て */
+    pMsg = malloc( msgSize );
+
+    /* 割当結果判定 */
+    if ( pMsg == NULL ) {
+        /* 失敗 */
+
+        /* エラー番号設定 */
+        MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
+
+        return LIBMVFS_RET_FAILURE;
+    }
+
+    /* メッセージ設定 */
+    memset( pMsg, 0, msgSize );
     pMsg->header.funcId = MVFS_FUNCID_WRITE;
     pMsg->header.type   = MVFS_TYPE_REQ;
     pMsg->globalFd      = globalFd;
@@ -328,23 +343,23 @@ static LibMvfsRet_t SendWriteReq( MkTaskId_t taskId,
     memcpy( pMsg->pBuffer, pBuffer, size );
 
     /* メッセージ送信 */
-    ret = LibMkMsgSend( taskId,        /* 送信先タスクID   */
-                        pMsg,          /* 送信メッセージ   */
-                        msgSize,       /* 送信メッセージ長 */
-                        &err     );    /* エラー内容       */
+    retMk = LibMkMsgSend( taskId,       /* 送信先タスクID   */
+                          pMsg,         /* 送信メッセージ   */
+                          msgSize,      /* 送信メッセージ長 */
+                          &errMk   );   /* エラー内容       */
 
     /* 送信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
+    if ( retMk != MK_RET_SUCCESS ) {
         /* 失敗 */
 
         /* エラー判定 */
-        if ( err == MK_ERR_NO_EXIST ) {
+        if ( errMk == MK_ERR_NO_EXIST ) {
             /* 送信先不明 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
 
-        } else if ( err == MK_ERR_NO_MEMORY ) {
+        } else if ( errMk == MK_ERR_NO_MEMORY ) {
             /* メモリ不足 */
 
             /* エラー番号設定 */
@@ -357,10 +372,13 @@ static LibMvfsRet_t SendWriteReq( MkTaskId_t taskId,
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
         }
 
-        return LIBMVFS_RET_FAILURE;
+        ret = LIBMVFS_RET_FAILURE;
     }
 
-    return LIBMVFS_RET_SUCCESS;
+    /* メッセージ解放 */
+    free( pMsg );
+
+    return ret;
 }
 
 
