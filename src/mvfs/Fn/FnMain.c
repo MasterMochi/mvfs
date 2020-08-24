@@ -1142,7 +1142,7 @@ static MLibStateNo_t Task0407( void *pArg )
     pFdInfo = pParam->pFdInfo;
 
     /* ready状態設定 */
-    pFdInfo->pNode->ready &= ~MVFS_READY_READ;
+    pFdInfo->pNode->ready &= ~MVFS_READY_WRITE;
     pFdInfo->pNode->ready |= pMsg->ready;
 
     /* Write応答メッセージ送信 */
