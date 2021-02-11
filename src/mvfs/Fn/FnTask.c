@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fn/FnTask.c                                                       */
-/*                                                                 2020/07/19 */
-/* Copyright (C) 2019-2020 Mochi.                                             */
+/*                                                                 2021/02/01 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -105,7 +105,7 @@ static const MLibStateTransition_t gStt[] = {
     /*--------------------+--------------------+------------+------------------------------------------*/
 
 /** タスク単位管理テーブル */
-static MLibDynamicArray_t *pgMngTbl;
+static MLibDynamicArray_t gMngTbl;
 
 
 /******************************************************************************/
@@ -391,7 +391,7 @@ void FnTaskRecvVfsReadyNtc( MkTaskId_t taskId,
     param.pNode     = pNode;
 
     /* タスク単位情報全操作 */
-    retMLib = MLibDynamicArrayForeach( pgMngTbl,
+    retMLib = MLibDynamicArrayForeach( &gMngTbl,
                                        &errMLib,
                                        &ExecEventVfsReadyNtc,
                                        &param                 );
@@ -430,7 +430,7 @@ void TaskInit( void )
     errMLib = MLIB_ERR_NONE;
 
     /* タスク単位管理テーブル初期化 */
-    retMLib = MLibDynamicArrayInit( &pgMngTbl,
+    retMLib = MLibDynamicArrayInit( &gMngTbl,
                                     sizeof ( taskInfo_t ),
                                     MNGTBL_CHUNK_SIZE,
                                     SIZE_MAX,
@@ -1045,7 +1045,7 @@ static void FreeTaskInfo( taskInfo_t *pTaskInfo )
         );
 
         /* タスク単位情報解放 */
-        MLibDynamicArrayFree( pgMngTbl, pTaskInfo->idx, NULL );
+        MLibDynamicArrayFree( &gMngTbl, pTaskInfo->idx, NULL );
     }
 
     return;
@@ -1079,7 +1079,7 @@ static taskInfo_t *GetTaskInfo( MkTaskId_t taskId )
     pTaskInfo = NULL;
 
     /* タスク単位情報検索 */
-    retMLib = MLibDynamicArraySearch( pgMngTbl,
+    retMLib = MLibDynamicArraySearch( &gMngTbl,
                                       &idx,
                                       ( void ** ) &pTaskInfo,
                                       &errMLib,
@@ -1093,7 +1093,7 @@ static taskInfo_t *GetTaskInfo( MkTaskId_t taskId )
     }
 
     /* タスク単位情報割当て */
-    retMLib = MLibDynamicArrayAlloc( pgMngTbl,
+    retMLib = MLibDynamicArrayAlloc( &gMngTbl,
                                      &idx,
                                      ( void ** ) &pTaskInfo,
                                      &errMLib                );

@@ -1,14 +1,15 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.c                                                           */
-/*                                                                 2019/09/25 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2021/02/01 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
 /* インクルード                                                               */
 /******************************************************************************/
 /* 標準ヘッダ */
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,7 +48,10 @@ static void InitFdTable( void );
 /* グローバル変数定義                                                         */
 /******************************************************************************/
 /** FDテーブル */
-static MLibDynamicArray_t *pgFdTable = NULL;
+static MLibDynamicArray_t gFdTable;
+
+/** 初期化済フラグ */
+static bool gInit = false;
 
 
 /******************************************************************************/
@@ -77,7 +81,7 @@ FdInfo_t *FdAlloc( void )
     errMLib = MLIB_ERR_NONE;
 
     /* FDテーブル初期化判定 */
-    if ( pgFdTable == NULL ) {
+    if ( gInit == false  ) {
         /* 未初期化 */
 
         /* 初期化 */
@@ -85,7 +89,7 @@ FdInfo_t *FdAlloc( void )
     }
 
     /* FD情報割当 */
-    retMLib = MLibDynamicArrayAlloc( pgFdTable,
+    retMLib = MLibDynamicArrayAlloc( &gFdTable,
                                      &localFd,
                                      ( void ** ) &pFdInfo,
                                      &errMLib              );
@@ -117,14 +121,14 @@ FdInfo_t *FdAlloc( void )
 void FdFree( uint32_t localFd )
 {
     /* FDテーブル初期化判定 */
-    if ( pgFdTable == NULL ) {
+    if ( gInit == false ) {
         /* 未初期化 */
 
         return;
     }
 
     /* FD情報解放 */
-    MLibDynamicArrayFree( pgFdTable, localFd, NULL );
+    MLibDynamicArrayFree( &gFdTable, localFd, NULL );
 
     return;
 }
@@ -156,14 +160,14 @@ FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd )
     errMLib = MLIB_ERR_NONE;
 
     /* FDテーブル初期化判定 */
-    if ( pgFdTable == NULL ) {
+    if ( gInit == false ) {
         /* 未初期化 */
 
         return NULL;
     }
 
     /* FDテーブル検索 */
-    retMLib = MLibDynamicArraySearch( pgFdTable,
+    retMLib = MLibDynamicArraySearch( &gFdTable,
                                       &localFd,
                                       ( void ** ) &pFdInfo,
                                       &errMLib,
@@ -205,14 +209,14 @@ FdInfo_t *FdGetLocalFdInfo( uint32_t localFd )
     errMLib = MLIB_ERR_NONE;
 
     /* FDテーブル初期化判定 */
-    if ( pgFdTable == NULL ) {
+    if ( gInit == false ) {
         /* 未初期化 */
 
         return NULL;
     }
 
     /* FD情報取得 */
-    retMLib = MLibDynamicArrayGet( pgFdTable,
+    retMLib = MLibDynamicArrayGet( &gFdTable,
                                    localFd,
                                    ( void ** ) &pFdInfo,
                                    &errMLib              );
@@ -275,11 +279,14 @@ static bool CheckGlobalFdInfo( uint_t  idx,
 static void InitFdTable( void )
 {
     /* FDテーブル初期化 */
-    MLibDynamicArrayInit( &pgFdTable,
+    MLibDynamicArrayInit( &gFdTable,
                           FDTABLE_CHUNK_SIZE,
                           sizeof ( FdInfo_t ),
                           LIBMVFS_FD_MAXNUM,
                           NULL                 );
+
+    /* 初期化済 */
+    gInit = true;
 
     return;
 }

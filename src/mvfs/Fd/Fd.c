@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fd/Fd.c                                                           */
-/*                                                                 2019/10/13 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2021/02/01 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -37,7 +37,7 @@
 /* 静的グローバル変数定義                                                     */
 /******************************************************************************/
 /** FDテーブル */
-static MLibDynamicArray_t *pgFdTable;
+static MLibDynamicArray_t gFdTable;
 
 
 /******************************************************************************/
@@ -70,7 +70,7 @@ FdInfo_t *FdAlloc( uint32_t   localFd,
     pFdInfo = NULL;
 
     /* FDエントリ割当 */
-    retMLib = MLibDynamicArrayAlloc( pgFdTable,
+    retMLib = MLibDynamicArrayAlloc( &gFdTable,
                                      &globalFd,
                                      ( void ** ) &pFdInfo,
                                      &errMLib              );
@@ -108,7 +108,7 @@ FdInfo_t *FdAlloc( uint32_t   localFd,
 void FdFree( uint32_t globalFd )
 {
     /* FD情報解放 */
-    MLibDynamicArrayFree( pgFdTable, globalFd, NULL );
+    MLibDynamicArrayFree( &gFdTable, globalFd, NULL );
 
     return;
 }
@@ -138,7 +138,7 @@ FdInfo_t *FdGet( uint32_t globalFd )
     errMLib = MLIB_ERR_NONE;
 
     /* FD情報取得 */
-    retMLib = MLibDynamicArrayGet( pgFdTable,
+    retMLib = MLibDynamicArrayGet( &gFdTable,
                                    globalFd,
                                    ( void ** ) &pFdInfo,
                                    &errMLib              );
@@ -173,7 +173,7 @@ void FdInit( void )
     errMLib = MLIB_ERR_NONE;
 
     /* FDテーブル初期化 */
-    retMLib = MLibDynamicArrayInit( &pgFdTable,
+    retMLib = MLibDynamicArrayInit( &gFdTable,
                                     FDTABLE_CHUNK_SIZE,
                                     sizeof ( FdInfo_t ),
                                     FDTABLE_ENTRY_NUM,
