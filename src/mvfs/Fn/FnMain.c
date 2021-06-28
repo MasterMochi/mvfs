@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/mvfs/Fn/FnMain.c                                                       */
-/*                                                                 2019/10/12 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2021/06/28 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -163,10 +163,11 @@ void FnMainRecvCloseReq( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
 
         /* Close応答メッセージ送信 */
@@ -269,10 +270,11 @@ void FnMainRecvOpenReq( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
 
         /* Open応答メッセージ送信 */
@@ -360,10 +362,11 @@ void FnMainRecvReadReq( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
 
         /* Read応答メッセージ送信 */
@@ -451,10 +454,11 @@ void FnMainRecvVfsCloseResp( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
         return;
     }
@@ -538,10 +542,11 @@ void FnMainRecvVfsOpenResp( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
         return;
     }
@@ -625,10 +630,11 @@ void FnMainRecvVfsReadResp( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
         return;
     }
@@ -712,10 +718,11 @@ void FnMainRecvVfsWriteResp( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
         return;
     }
@@ -799,10 +806,11 @@ void FnMainRecvWriteReq( MkTaskId_t taskId,
         /* 失敗 */
 
         DEBUG_LOG_ERR(
-            "%s(): MLibStateExec(): ret=%d, err=%#X",
+            "%s(): MLibStateExec(): ret=%d, err=%#X, prev=%d",
             __func__,
             retMLib,
-            errMLib
+            errMLib,
+            prevState
         );
 
         /* Write応答メッセージ送信 */
