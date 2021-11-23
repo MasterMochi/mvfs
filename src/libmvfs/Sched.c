@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Sched.c                                                        */
-/*                                                                 2020/04/30 */
-/* Copyright (C) 2019-2020 Mochi.                                             */
+/*                                                                 2021/11/15 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -22,9 +22,11 @@
 #include <libmk.h>
 #include <libmvfs.h>
 #include <MLib/MLib.h>
+#include <MLib/MLibList.h>
 
 /* 共通ヘッダ */
 #include <mvfs.h>
+#include "Sched.h"
 
 
 /******************************************************************************/
@@ -53,6 +55,16 @@ static void ProcVfsReadReq( LibMvfsSchedInfo_t  *pInfo,
 
 
 /******************************************************************************/
+/* 静的グローバル変数                                                         */
+/******************************************************************************/
+/** リスト有効フラグ */
+static bool gListEnable = false;
+
+/** メッセージバッファリスト */
+static MLibList_t gList;
+
+
+/******************************************************************************/
 /* ライブラリ関数定義                                                         */
 /******************************************************************************/
 /******************************************************************************/
@@ -76,13 +88,14 @@ static void ProcVfsReadReq( LibMvfsSchedInfo_t  *pInfo,
 LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
                                 uint32_t           *pErrNo )
 {
-    char         *pBuffer;  /* 受信バッファ               */
-    size_t       size;      /* 受信サイズ                 */
-    MkRet_t      retLibMk;  /* カーネル戻り値             */
-    MkErr_t      err;       /* エラー内容                 */
-    MkTaskId_t   src;       /* 送信元タスクID             */
-    MkTaskId_t   mvfs;      /* 仮想ファイルサーバタスクID */
-    LibMvfsRet_t ret;       /* 戻り値                     */
+    char          *pBuffer; /* 受信バッファ               */
+    size_t        size;     /* 受信サイズ                 */
+    MkRet_t       retLibMk; /* カーネル戻り値             */
+    MkErr_t       err;      /* エラー内容                 */
+    MkTaskId_t    src;      /* 送信元タスクID             */
+    MkTaskId_t    mvfs;     /* 仮想ファイルサーバタスクID */
+    LibMvfsRet_t  ret;      /* 戻り値                     */
+    SchedMsgBuf_t *pMsgBuf; /* メッセージバッファ         */
 
     /* 初期化 */
     pBuffer  = NULL;
@@ -91,6 +104,7 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
     err      = MK_ERR_NONE;
     src      = MK_TASKID_NULL;
     mvfs     = MK_TASKID_NULL;
+    pMsgBuf  = NULL;
 
     /* エラー番号初期化 */
     MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NONE );
@@ -118,8 +132,28 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
         return LIBMVFS_RET_FAILURE;
     }
 
+    /* Vfs系メッセージバッファリスト初期化 */
+    MLibListInit( &gList );
+    gListEnable = true;
+
     /* ループ */
     while ( true ) {
+        /* メッセージバッファ取得 */
+        pMsgBuf = ( SchedMsgBuf_t * ) MLibListRemoveHead( &gList );
+
+        /* メッセージ有無判定 */
+        if ( pMsgBuf != NULL ) {
+            /* メッセージ有 */
+
+            /* メッセージ処理 */
+            Proc( pInfo, ( MvfsMsgHdr_t * ) pMsgBuf->buffer );
+
+            /* メッセージバッファ解放 */
+            free( pMsgBuf );
+
+            continue;
+        }
+
         /* 初期化 */
         memset( pBuffer, 0, MK_MSG_SIZE_MAX );
 
@@ -166,6 +200,31 @@ LibMvfsRet_t LibMvfsSchedStart( LibMvfsSchedInfo_t *pInfo,
     free( pBuffer );
 
     return ret;
+}
+
+
+/******************************************************************************/
+/* ライブラリ内グローバル関数定義                                             */
+/******************************************************************************/
+/******************************************************************************/
+/**
+ * @brief       メッセージバッファ追加
+ * @details     メッセージバッファをスケジューラに追加する。
+ *
+ * @param[in]   *pMsgBuf メッセージバッファ
+ */
+/******************************************************************************/
+void SchedAddMsgBuffer( SchedMsgBuf_t *pMsgBuf )
+{
+    /* リスト有効判定 */
+    if ( gListEnable != false ) {
+        /* リスト有効 */
+
+        /* リスト追加 */
+        MLibListInsertTail( &gList, &( pMsgBuf->nodeInfo ) );
+    }
+
+    return;
 }
 
 

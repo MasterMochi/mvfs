@@ -1439,7 +1439,7 @@ void MsgSendSelectResp( MkTaskId_t dst,
     memset( pMsg, 0, size );
 
     /* メッセージ設定 */
-    pMsg->header.funcId = MVFS_FUNCID_READ;
+    pMsg->header.funcId = MVFS_FUNCID_SELECT;
     pMsg->header.type   = MVFS_TYPE_RESP;
     pMsg->result        = result;
     pMsg->readFdNum     = readFdNum;

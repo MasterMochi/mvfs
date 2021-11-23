@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* libmvfs.h                                                                  */
-/*                                                                 2020/05/14 */
-/* Copyright (C) 2019-2020 Mochi.                                             */
+/*                                                                 2021/11/07 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 #ifndef __LIB_MVFS_H__
@@ -135,15 +135,17 @@ extern LibMvfsRet_t LibMvfsGetTaskId( MkTaskId_t *pTaskId,
 extern LibMvfsRet_t LibMvfsMount( const char *pPath,
                                   uint32_t   *pErrNo );
 /* Open */
-extern LibMvfsRet_t LibMvfsOpen( uint32_t   *pLocalFd,
+extern LibMvfsRet_t LibMvfsOpen( uint32_t   *pFd,
                                  const char *pPath,
-                                 uint32_t   *pErrNo    );
+                                 uint32_t   *pErrNo );
 /* Read */
 extern LibMvfsRet_t LibMvfsRead( uint32_t fd,
                                  void     *pBuffer,
                                  size_t   bufferSize,
                                  size_t   *pReadSize,
                                  uint32_t *pErrNo     );
+/* Reopen */
+extern LibMvfsRet_t LibMvfsReopen( uint32_t *pErrNo );
 /* Select */
 extern LibMvfsRet_t LibMvfsSelect( LibMvfsFds_t *pReadFds,
                                    LibMvfsFds_t *pWriteFds,

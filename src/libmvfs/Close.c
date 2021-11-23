@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Close.c                                                        */
-/*                                                                 2020/04/30 */
-/* Copyright (C) 2019-2020 Mochi.                                             */
+/*                                                                 2021/11/17 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -25,6 +25,7 @@
 
 /* モジュール内ヘッダ */
 #include "Fd.h"
+#include "Sched.h"
 
 
 /******************************************************************************/
@@ -163,63 +164,99 @@ static LibMvfsRet_t ReceiveCloseResp( MkTaskId_t         taskId,
                                       MvfsMsgCloseResp_t *pMsg,
                                       uint32_t           *pErrNo )
 {
-    MkRet_t ret;    /* 戻り値               */
-    MkErr_t err;    /* カーネルエラー内容   */
-    size_t  size;   /* 受信メッセージサイズ */
+    MkRet_t       retMk;    /* 戻り値               */
+    MkErr_t       errMk;    /* カーネルエラー内容   */
+    size_t        size;     /* 受信メッセージサイズ */
+    LibMvfsRet_t  ret;      /* 戻り値               */
+    MvfsMsgHdr_t  *pHeader; /* メッセージヘッダ     */
+    SchedMsgBuf_t *pMsgBuf; /* メッセージバッファ   */
 
     /* 初期化 */
-    ret  = MK_RET_FAILURE;
-    err  = MK_ERR_NONE;
-    size = 0;
+    retMk   = MK_RET_FAILURE;
+    errMk   = MK_ERR_NONE;
+    size    = 0;
+    ret     = LIBMVFS_RET_FAILURE;
+    pHeader = NULL;
+    pMsgBuf = NULL;
 
-    /* メッセージ受信 */
-    ret = LibMkMsgReceive( taskId,                          /* 受信タスクID   */
-                           pMsg,                            /* バッファ       */
-                           sizeof ( MvfsMsgCloseResp_t ),   /* バッファサイズ */
-                           NULL,                            /* 送信元タスクID */
-                           &size,                           /* 受信サイズ     */
-                           0,                               /* タイムアウト値 */
-                           &err                           );/* エラー番号     */
+    /* close応答受信まで繰り返し */
+    while ( true ) {
+        /* メッセージバッファ割当 */
+        pMsgBuf = malloc( sizeof ( SchedMsgBuf_t ) );
+        pHeader = ( MvfsMsgHdr_t * ) pMsgBuf->buffer;
 
-    /* 受信結果判定 */
-    if ( ret != MK_RET_SUCCESS ) {
-        /* 失敗 */
-
-        /* エラー番号判定 */
-        if ( err == MK_ERR_NO_EXIST ) {
-            /* 存在しないタスクID */
-
-            /* エラー番号設定 */
-            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
-
-        } else if ( err == MK_ERR_NO_MEMORY ) {
-            /* メモリ不足 */
+        /* 割当結果判定 */
+        if ( pMsgBuf == NULL ) {
+            /* 失敗 */
 
             /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
 
-        } else {
-            /* その他エラー */
-
-            /* エラー番号設定 */
-            MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
+            return LIBMVFS_RET_FAILURE;
         }
 
-        return LIBMVFS_RET_FAILURE;
+        /* メッセージ受信 */
+        retMk = LibMkMsgReceive( taskId,                /* 受信タスクID   */
+                                 pMsgBuf->buffer,       /* バッファ       */
+                                 MK_MSG_SIZE_MAX,       /* バッファサイズ */
+                                 NULL,                  /* 送信元タスクID */
+                                 &size,                 /* 受信サイズ     */
+                                 0,                     /* タイムアウト値 */
+                                 &errMk           );    /* エラー番号     */
+
+        /* 受信結果判定 */
+        if ( retMk != MK_RET_SUCCESS ) {
+            /* 失敗 */
+
+            /* エラー番号判定 */
+            if ( errMk == MK_ERR_NO_EXIST ) {
+                /* 存在しないタスクID */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_FOUND );
+
+            } else if ( errMk == MK_ERR_NO_MEMORY ) {
+                /* メモリ不足 */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NO_MEMORY );
+
+            } else {
+                /* その他エラー */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_OTHER );
+            }
+
+            /* 戻り値設定 */
+            ret = LIBMVFS_RET_FAILURE;
+            break;
+        }
+
+        /* メッセージチェック */
+        if ( ( pHeader->funcId != MVFS_FUNCID_CLOSE             ) ||
+             ( pHeader->type   != MVFS_TYPE_RESP                ) ||
+             ( size            != sizeof ( MvfsMsgCloseResp_t ) )    ) {
+            /* 他メッセージ */
+
+            /* メッセージバッファ追加 */
+            SchedAddMsgBuffer( pMsgBuf );
+
+            continue;
+        }
+
+        /* メッセージコピー */
+        memcpy( pMsg, pMsgBuf->buffer, size );
+
+        /* 戻り値設定 */
+        ret = LIBMVFS_RET_SUCCESS;
+        break;
     }
 
-    /* メッセージチェック */
-    if ( ( pMsg->header.funcId != MVFS_FUNCID_CLOSE ) &&
-         ( pMsg->header.type   != MVFS_TYPE_RESP    )    ) {
-        /* メッセージ不正 */
+    /* メッセージバッファ解放 */
+    free( pMsgBuf );
 
-        /* エラー番号設定 */
-        MLIB_SET_IFNOT_NULL( pErrNo, LIBMVFS_ERR_NOT_RESP );
-
-        return LIBMVFS_RET_FAILURE;
-    }
-
-    return LIBMVFS_RET_SUCCESS;
+    return ret;
 }
 
 

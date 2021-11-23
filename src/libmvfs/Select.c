@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Select.c                                                       */
-/*                                                                 2020/07/25 */
-/* Copyright (C) 2019-2020 Mochi.                                             */
+/*                                                                 2021/11/17 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 /******************************************************************************/
@@ -23,6 +23,7 @@
 
 /* モジュール内ヘッダ */
 #include "Fd.h"
+#include "Sched.h"
 
 
 /******************************************************************************/
@@ -290,80 +291,111 @@ static LibMvfsRet_t ReceiveSelectResp( MkTaskId_t   taskId,
                                        uint32_t     timeout,
                                        uint32_t     *pErr       )
 {
-    size_t              size;   /* 受信メッセージサイズ  */
-    MkRet_t             retMk;  /* カーネル戻り値        */
-    MkErr_t             errMk;  /* カーネルエラー        */
-    MvfsMsgSelectResp_t *pMsg;  /* Select応答メッセージ　*/
+    size_t              size;       /* 受信メッセージサイズ  */
+    MkRet_t             retMk;      /* カーネル戻り値        */
+    MkErr_t             errMk;      /* カーネルエラー        */
+    LibMvfsRet_t        ret;        /* 戻り値                */
+    SchedMsgBuf_t       *pMsgBuf;   /* メッセージバッファ    */
+    MvfsMsgSelectResp_t *pMsg;      /* Select応答メッセージ　*/
 
     /* 初期化 */
-    size  = 0;
-    retMk = MK_RET_FAILURE;
-    errMk = MK_ERR_NONE;
-    pMsg  = NULL;
+    size    = 0;
+    retMk   = MK_RET_FAILURE;
+    errMk   = MK_ERR_NONE;
+    ret     = LIBMVFS_RET_FAILURE;
+    pMsg    = NULL;
+    pMsgBuf = NULL;
 
-    /* メッセージバッファ割当 */
-    pMsg = malloc( MK_MSG_SIZE_MAX );
+    /* select応答受信まで繰り返し */
+    while ( true ) {
+        /* メッセージバッファ割当 */
+        pMsgBuf = malloc( sizeof ( SchedMsgBuf_t ) );
+        pMsg    = ( MvfsMsgSelectResp_t * ) pMsgBuf->buffer;
 
-    /* 割当結果判定 */
-    if ( pMsg == NULL ) {
-        /* 失敗 */
-        MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NO_MEMORY );
-        return LIBMVFS_RET_FAILURE;
-    }
+        /* 割当結果判定 */
+        if ( pMsgBuf == NULL ) {
+            /* 失敗 */
 
-    /* メッセージ受信 */
-    retMk = LibMkMsgReceive( taskId,                /* 受信タスクID   */
-                             pMsg,                  /* バッファ       */
-                             MK_MSG_SIZE_MAX,       /* バッファサイズ */
-                             NULL,                  /* 送信元タスクID */
-                             &size,                 /* 受信サイズ     */
-                             timeout,               /* タイムアウト値 */
-                             &errMk           );    /* エラー要因     */
-
-    /* 受信結果判定 */
-    if ( retMk != MK_RET_SUCCESS ) {
-        /* 失敗 */
-
-        /* エラー判定 */
-        if ( errMk == MK_ERR_NO_EXIST ) {
-            /* 存在しないタスクID */
-            MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NOT_FOUND );
-
-        } else if ( errMk == MK_ERR_NO_MEMORY ) {
-            /* メモリ不足 */
+            /* エラー番号設定 */
             MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NO_MEMORY );
 
-        } else if ( errMk == MK_ERR_TIMEOUT ) {
-            /* タイムアウト */
-            MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_TIMEOUT );
-
-        } else {
-            /* その他エラー */
-            MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_OTHER );
+            return LIBMVFS_RET_FAILURE;
         }
 
-        return LIBMVFS_RET_FAILURE;
+        /* メッセージ受信 */
+        retMk = LibMkMsgReceive( taskId,                /* 受信タスクID   */
+                                 pMsgBuf->buffer,       /* バッファ       */
+                                 MK_MSG_SIZE_MAX,       /* バッファサイズ */
+                                 NULL,                  /* 送信元タスクID */
+                                 &size,                 /* 受信サイズ     */
+                                 timeout,               /* タイムアウト値 */
+                                 &errMk           );    /* エラー要因     */
+
+        /* 受信結果判定 */
+        if ( retMk != MK_RET_SUCCESS ) {
+            /* 失敗 */
+
+            /* エラー判定 */
+            if ( errMk == MK_ERR_NO_EXIST ) {
+                /* 存在しないタスクID */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NOT_FOUND );
+
+            } else if ( errMk == MK_ERR_NO_MEMORY ) {
+                /* メモリ不足 */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NO_MEMORY );
+
+            } else if ( errMk == MK_ERR_TIMEOUT ) {
+                /* タイムアウト */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_TIMEOUT );
+
+            } else {
+                /* その他エラー */
+
+                /* エラー番号設定 */
+                MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_OTHER );
+            }
+
+            /* 戻り値設定 */
+            ret = LIBMVFS_RET_FAILURE;
+            break;
+        }
+
+        /* メッセージチェック */
+        if ( ( pMsg->header.funcId != MVFS_FUNCID_SELECT ) ||
+             ( pMsg->header.type   != MVFS_TYPE_RESP     )    ) {
+            /* 他メッセージ */
+
+            /* メッセージバッファ追加 */
+            SchedAddMsgBuffer( pMsgBuf );
+
+            continue;
+        }
+
+        /* 読込レディFDビットリスト設定 */
+        ConvertListToFds( pReadFds,
+                          &( pMsg->fd[ 0 ] ),
+                          pMsg->readFdNum     );
+
+        /* 書込レディFDビットリスト設定 */
+        ConvertListToFds( pWriteFds,
+                          &( pMsg->fd[ pMsg->readFdNum ] ),
+                          pMsg->writeFdNum                  );
+
+        /* 戻り値設定 */
+        ret = LIBMVFS_RET_SUCCESS;
+        break;
     }
 
-    /* メッセージチェック */
-    if ( ( pMsg->header.funcId != MVFS_FUNCID_SELECT ) &&
-         ( pMsg->header.type   != MVFS_TYPE_RESP     )    ) {
-        /* メッセージ不正 */
-        MLIB_SET_IFNOT_NULL( pErr, LIBMVFS_ERR_NOT_RESP );
-        return LIBMVFS_RET_FAILURE;
-    }
+    /* メッセージバッファ解放 */
+    free( pMsgBuf );
 
-    /* 読込レディFDビットリスト設定 */
-    ConvertListToFds( pReadFds,
-                      &( pMsg->fd[ 0 ] ),
-                      pMsg->readFdNum     );
-
-    /* 書込レディFDビットリスト設定 */
-    ConvertListToFds( pWriteFds,
-                      &( pMsg->fd[ pMsg->readFdNum ] ),
-                      pMsg->writeFdNum                  );
-
-    return LIBMVFS_RET_SUCCESS;
+    return ret;
 }
 
 

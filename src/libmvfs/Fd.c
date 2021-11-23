@@ -1,7 +1,7 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.c                                                           */
-/*                                                                 2021/02/01 */
+/*                                                                 2021/11/07 */
 /* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
@@ -42,6 +42,10 @@ static bool CheckGlobalFdInfo( uint_t  idx,
                                va_list vaList   );
 /* FDテーブル初期化 */
 static void InitFdTable( void );
+/* 全FD情報走査コールバック */
+static void ProcForeach( uint_t  idx,
+                         void    *pEntry,
+                         va_list vaList   );
 
 
 /******************************************************************************/
@@ -55,7 +59,7 @@ static bool gInit = false;
 
 
 /******************************************************************************/
-/* グローバル関数定義                                                         */
+/* ライブラリ内グローバル関数定義                                             */
 /******************************************************************************/
 /******************************************************************************/
 /**
@@ -107,6 +111,29 @@ FdInfo_t *FdAlloc( void )
     pFdInfo->readIdx  = 0;
 
     return pFdInfo;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       全FD情報走査
+ * @details     全てのFD情報毎にコールバック関数を呼び出す。
+ *
+ * @param[in]   pCallBack コールバック関数
+ * @param[in]   *pParam   コールバック関数引数
+ */
+/******************************************************************************/
+void FdForeach( FdForeachCB_t pCallBack,
+                void          *pParam    )
+{
+    /* 全FD情報走査 */
+    MLibDynamicArrayForeach( &gFdTable,
+                             NULL,
+                             ProcForeach,
+                             pCallBack,
+                             pParam       );
+
+    return;
 }
 
 
@@ -287,6 +314,34 @@ static void InitFdTable( void )
 
     /* 初期化済 */
     gInit = true;
+
+    return;
+}
+
+
+/******************************************************************************/
+/**
+ * @brief       全FD情報走査コールバック
+ * @details     全FD情報走査を行った時にFD情報毎にコールバック関数を呼び出す。
+ *
+ * @param[in]   idx     インデックス
+ * @param[in]   *pEntry FD情報
+ * @param[in]   vaList  可変長引数リスト
+ */
+/******************************************************************************/
+static void ProcForeach( uint_t  idx,
+                         void    *pEntry,
+                         va_list vaList   )
+{
+    void          *pParam;      /* 引数             */
+    FdForeachCB_t pCallBack;    /* コールバック関数 */
+
+    /* 初期化 */
+    pCallBack = va_arg( vaList, FdForeachCB_t );
+    pParam    = va_arg( vaList, void *        );
+
+    /* コールバック関数呼出し */
+    ( pCallBack )( ( FdInfo_t * ) pEntry, pParam );
 
     return;
 }

@@ -1,8 +1,8 @@
 /******************************************************************************/
 /*                                                                            */
 /* src/libmvfs/Fd.h                                                           */
-/*                                                                 2019/09/25 */
-/* Copyright (C) 2019 Mochi.                                                  */
+/*                                                                 2021/11/07 */
+/* Copyright (C) 2019-2021 Mochi.                                             */
 /*                                                                            */
 /******************************************************************************/
 #ifndef FD_H
@@ -14,18 +14,26 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* 共通ヘッダ */
+#include <mvfs.h>
+
 
 /******************************************************************************/
 /* 定義                                                                       */
 /******************************************************************************/
 /** ファイルディスクリプタ情報 */
 typedef struct {
-    bool     used;      /**< 使用済みフラグ     */
-    uint32_t localFd;   /**< ローカルFD         */
-    uint32_t globalFd;  /**< グローバルFD       */
-    uint64_t writeIdx;  /**< 書込みインデックス */
-    uint64_t readIdx;   /**< 読込みインデックス */
+    bool     used;                          /**< 使用済みフラグ     */
+    uint32_t localFd;                       /**< ローカルFD         */
+    uint32_t globalFd;                      /**< グローバルFD       */
+    uint64_t writeIdx;                      /**< 書込みインデックス */
+    uint64_t readIdx;                       /**< 読込みインデックス */
+    char     path[ MVFS_PATH_MAXLEN + 1 ];  /**< パス               */
 } FdInfo_t;
+
+/** 全FD情報走査コールバック関数型 */
+typedef void ( *FdForeachCB_t )( FdInfo_t *pFdInfo,
+                                 void     *pParam   );
 
 
 /******************************************************************************/
@@ -39,6 +47,9 @@ extern void FdFree( uint32_t localFd );
 extern FdInfo_t *FdGetGlobalFdInfo( uint32_t globalFd );
 /* ローカルFD取得 */
 extern FdInfo_t *FdGetLocalFdInfo( uint32_t localFd );
+/* 全FD情報走査 */
+extern void FdForeach( FdForeachCB_t pCallBack,
+                       void          *pParam    );
 
 
 /******************************************************************************/
